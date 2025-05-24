@@ -6,6 +6,15 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+const (
+	statusPendingPayment = "pending_payment"
+	statusPaid           = "paid"
+	statusProcessing     = "processing"
+	statusShipped        = "shipped"
+	statusDelivered      = "delivered"
+	statusCancelled      = "cancelled"
+)
+
 type Order struct {
 }
 

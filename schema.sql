@@ -1,11 +1,28 @@
-CREATE TYPE order_status AS ENUM (
-  'pending_payment', 'paid', 'processing', 'shipped', 'delivered', 'cancelled'
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    role VARCHAR(16) NOT NULL DEFAULT 'user',
+    phone_number VARCHAR(20) NOT NULL UNIQUE,
+    pinfl VARCHAR(14),
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE products (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    image_url TEXT,
+    price INTEGER NOT NULL CHECK (price >= 0),
+    stock_quantity INTEGER NOT NULL DEFAULT 0 CHECK (stock_quantity >= 0),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE orders (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
-    status order_status NOT NULL,
+    status VARCHAR(32) NOT NULL,
     delivery_date DATE,
     pickup_point VARCHAR(255),
     order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -14,19 +31,6 @@ CREATE TABLE orders (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE OR REPLACE FUNCTION update_timestamp()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = CURRENT_TIMESTAMP;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER update_orders_updated_at
-BEFORE UPDATE ON orders
-FOR EACH ROW
-EXECUTE FUNCTION update_timestamp();
 
 CREATE TABLE order_items (
     id SERIAL PRIMARY KEY,
