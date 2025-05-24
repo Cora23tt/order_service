@@ -19,6 +19,10 @@ import (
 	orderHandler "github.com/Cora23tt/order_service/internal/rest/handlers/order"
 	orderService "github.com/Cora23tt/order_service/internal/usecase/order"
 
+	productRepo "github.com/Cora23tt/order_service/internal/repository/product"
+	productHandler "github.com/Cora23tt/order_service/internal/rest/handlers/product"
+	productService "github.com/Cora23tt/order_service/internal/usecase/product"
+
 	"github.com/Cora23tt/order_service/internal/rest"
 	"github.com/Cora23tt/order_service/internal/rest/middleware"
 	"github.com/Cora23tt/order_service/pkg/db"
@@ -62,6 +66,10 @@ func execute(host, port, dsn string) error {
 		orderRepo.NewRepo,
 		orderService.NewService,
 		orderHandler.NewHandler,
+
+		productRepo.NewRepo,
+		productHandler.NewHandler,
+		productService.NewService,
 
 		rest.NewServer,
 

@@ -24,3 +24,5 @@ vendor/
 .vscode
 
 coverage.html
+
+.env

@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"github.com/Cora23tt/order_service/internal/rest/handlers/product"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -11,7 +12,8 @@ import (
 )
 
 func NewServer(mux *gin.Engine, auth *auth.Handler,
-	order *order.Handler, mdlwr *middleware.Middleware) *Server {
+	order *order.Handler, mdlwr *middleware.Middleware,
+	product *product.Handler) *Server {
 	return &Server{
 		mux:   mux,
 		order: order,
@@ -21,10 +23,11 @@ func NewServer(mux *gin.Engine, auth *auth.Handler,
 }
 
 type Server struct {
-	mux   *gin.Engine
-	order *order.Handler
-	auth  *auth.Handler
-	m     *middleware.Middleware
+	mux     *gin.Engine
+	order   *order.Handler
+	auth    *auth.Handler
+	product *product.Handler
+	m       *middleware.Middleware
 }
 
 func (s *Server) Init() {
@@ -48,6 +51,14 @@ func (s *Server) Init() {
 		secureGroup.GET("/orders/:id", s.order.GetByID)
 		secureGroup.PUT("/orders/:id", s.order.Update)
 		secureGroup.DELETE("/orders/:id", s.order.Delete)
+	}
+	productGroup := s.mux.Group(baseUrl + "/products")
+	{
+		productGroup.POST("/", s.product.AddProduct)
+		productGroup.GET("/", s.product.GetProducts)
+		productGroup.GET("/:id", s.product.GetProduct)
+		productGroup.DELETE("/:id", s.product.DeleteProduct)
+		productGroup.PUT("/:id", s.product.UpdateProduct)
 	}
 }
 
