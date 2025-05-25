@@ -54,8 +54,6 @@ func (s *Server) SetupRoutes() {
 
 	secureGroup := s.mux.Group(baseUrl + "/secure").Use(s.middleware.Auth())
 	{
-		secureGroup.GET("/me", s.auth.Me)
-
 		secureGroup.POST("/orders", s.order.Create)
 		secureGroup.GET("/orders", s.order.GetAll)
 		secureGroup.GET("/orders/:id", s.order.GetByID)

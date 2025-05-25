@@ -29,7 +29,7 @@ import (
 )
 
 func main() {
-	err := godotenv.Load()
+	err := godotenv.Load("../../.env")
 	if err != nil {
 		log.Println("Error loading .env file, using default environment variables:", err)
 	}
@@ -43,7 +43,6 @@ func execute() error {
 	deps := []any{
 		logger.New,
 		db.NewDB,
-
 		gin.New,
 		middleware.New,
 
