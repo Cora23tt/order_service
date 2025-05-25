@@ -10,49 +10,51 @@ import (
 func InitAllSchemas(ctx context.Context, db *pgxpool.Pool) error {
 	queries := []string{
 		`
-		CREATE TABLE IF NOT EXISTS notes (
-			id UUID PRIMARY KEY,
-			title TEXT NOT NULL,
-			content TEXT,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-		);
-		`,
-		`
-		CREATE TABLE IF NOT EXISTS tasks (
-			id UUID PRIMARY KEY,
-			title TEXT NOT NULL,
-			description TEXT,
-			status TEXT CHECK (
-				status IN ('pending', 'in_progress', 'completed')
-			) NOT NULL,
+		CREATE TABLE IF NOT EXISTS users (
+			id SERIAL PRIMARY KEY,
+			role VARCHAR(16) NOT NULL DEFAULT 'user',
+			phone_number VARCHAR(20) NOT NULL UNIQUE,
+			pinfl VARCHAR(14),
+			password_hash TEXT NOT NULL,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);
 		`,
-		`CREATE TABLE IF NOT EXISTS events (
-			id UUID PRIMARY KEY,
-			name TEXT NOT NULL,
-			location TEXT NOT NULL,
-			start_time TIMESTAMP NOT NULL,
-			end_time TIMESTAMP NOT NULL,
-			status TEXT NOT NULL CHECK (
-				status IN ('scheduled', 'ongoing', 'finished', 'cancelled')
-			)
+		`
+		CREATE TABLE IF NOT EXISTS products (
+			id SERIAL PRIMARY KEY,
+			name VARCHAR(255) NOT NULL,
+			description TEXT,
+			image_url TEXT,
+			price INTEGER NOT NULL CHECK (price >= 0),
+			stock_quantity INTEGER NOT NULL DEFAULT 0 CHECK (stock_quantity >= 0),
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);
+
+		`,
+		`
+		CREATE TABLE IF NOT EXISTS orders (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER NOT NULL REFERENCES users(id),
+			status VARCHAR(32) NOT NULL,
+			delivery_date DATE,
+			pickup_point VARCHAR(255),
+			order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			total_amount INTEGER NOT NULL,
+			receipt_url TEXT,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);
 		`,
 		`
-		CREATE TABLE IF NOT EXISTS users (
-			id UUID PRIMARY KEY,
-			username TEXT UNIQUE NOT NULL,
-			hashed_password TEXT NOT NULL,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-		);
-		`,
-		`
-		CREATE TABLE IF NOT EXISTS sessions (
-			token UUID PRIMARY KEY,
-			user_id UUID REFERENCES users(id),
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		CREATE TABLE IF NOT EXISTS order_items (
+			id SERIAL PRIMARY KEY,
+			order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+			product_id INTEGER NOT NULL REFERENCES products(id),
+			quantity INTEGER NOT NULL CHECK (quantity > 0),
+			price INTEGER NOT NULL,
+			total_price INTEGER GENERATED ALWAYS AS (quantity * price) STORED
 		);
 		`,
 	}
