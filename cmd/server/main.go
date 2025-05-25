@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/dig"
-	"go.uber.org/zap"
 
 	authRepo "github.com/Cora23tt/order_service/internal/repository/auth"
 	authHandler "github.com/Cora23tt/order_service/internal/rest/handlers/auth"
@@ -26,6 +25,7 @@ import (
 	"github.com/Cora23tt/order_service/internal/rest"
 	"github.com/Cora23tt/order_service/internal/rest/middleware"
 	"github.com/Cora23tt/order_service/pkg/db"
+	"github.com/Cora23tt/order_service/pkg/logger"
 )
 
 func main() {
@@ -43,20 +43,12 @@ func main() {
 
 func execute(host, port, dsn string) error {
 	deps := []any{
+		logger.New,
 		func() (*pgxpool.Pool, error) {
 			return db.NewDB(dsn)
 		},
 
 		gin.New,
-
-		func() (*zap.SugaredLogger, error) {
-			logger, err := zap.NewDevelopment()
-			if err != nil {
-				return nil, err
-			}
-			return logger.Sugar(), nil
-		},
-
 		middleware.New,
 
 		authHandler.NewHandler,

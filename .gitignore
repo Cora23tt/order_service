@@ -26,3 +26,6 @@ vendor/
 coverage.html
 
 .env
+
+# vscide DB extension sessions
+*.session.sql

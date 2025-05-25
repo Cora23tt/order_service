@@ -7,15 +7,17 @@ import (
 	"github.com/Cora23tt/order_service/internal/usecase/auth"
 	pkgerrors "github.com/Cora23tt/order_service/pkg/errors"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type Handler struct {
 	service *auth.Service
+	log     *zap.SugaredLogger
 }
 
-func NewHandler(service *auth.Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service *auth.Service, log *zap.SugaredLogger) *Handler {
+	return &Handler{service: service, log: log}
 }
 
 type Credentials struct {
