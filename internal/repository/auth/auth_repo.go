@@ -21,34 +21,36 @@ func NewRepo(db *pgxpool.Pool) *Repo {
 }
 
 type User struct {
-	ID             string
-	Username       string
-	HashedPassword string
 	CreatedAt      time.Time
+	PhoneNumber    string
+	HashedPassword string
+	ID             int
 }
 
-func (r *Repo) Create(ctx context.Context, user *User) error {
-	_, err := r.db.Exec(ctx, `
-		INSERT INTO users (id, username, hashed_password)
-		VALUES ($1, $2, $3)
-	`, user.ID, user.Username, user.HashedPassword)
+func (r *Repo) Create(ctx context.Context, user *User) (int, error) {
+	userID := 0
+	err := r.db.QueryRow(ctx, `
+        INSERT INTO users (phone_number, password_hash)
+        VALUES ($1, $2)
+        RETURNING id
+    `, user.PhoneNumber, user.HashedPassword).Scan(&userID)
 	if err != nil {
 		pgErr, ok := err.(*pgconn.PgError)
 		if ok && pgErr.Code == "23505" {
-			return pkgErrors.ErrAlreadyExists
+			return 0, pkgErrors.ErrAlreadyExists
 		}
-		return err
+		return 0, err
 	}
-	return nil
+	return userID, nil
 }
 
-func (r *Repo) GetByUsername(ctx context.Context, username string) (*User, error) {
+func (r *Repo) GetByPhoneNumber(ctx context.Context, phoneNumber string) (*User, error) {
 	var user User
 	err := r.db.QueryRow(ctx, `
-		SELECT id, username, hashed_password, created_at
+		SELECT id, phone_number, password_hash, created_at
 		FROM users
-		WHERE username = $1
-	`, username).Scan(&user.ID, &user.Username, &user.HashedPassword, &user.CreatedAt)
+		WHERE phone_number = $1
+	`, phoneNumber).Scan(&user.ID, &user.PhoneNumber, &user.HashedPassword, &user.CreatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, pkgErrors.ErrNotFound
@@ -74,22 +76,6 @@ func (r *Repo) GetUserID(ctx context.Context, token string) (string, error) {
 	return userID, nil
 }
 
-func (r *Repo) GetUserByID(ctx context.Context, id string) (*User, error) {
-	var user User
-	err := r.db.QueryRow(ctx, `
-		SELECT id, username, hashed_password, created_at
-		FROM users
-		WHERE id = $1
-	`, id).Scan(&user.ID, &user.Username, &user.HashedPassword, &user.CreatedAt)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, pkgErrors.ErrNotFound
-		}
-		return nil, err
-	}
-	return &user, nil
-}
-
 func (r *Repo) StoreSessionToken(ctx context.Context, token, userID string) error {
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO sessions (token, user_id)
@@ -99,4 +85,21 @@ func (r *Repo) StoreSessionToken(ctx context.Context, token, userID string) erro
 		return err
 	}
 	return nil
+}
+
+func (r *Repo) GetUser(ctx context.Context, phoneNumber string) (User, error) {
+	var user User
+	err := r.db.QueryRow(ctx, `
+		SELECT id, phone_number, password_hash
+		FROM users
+		WHERE phone_number = $1
+	`, phoneNumber).Scan(&user.ID, &user.PhoneNumber, &user.HashedPassword)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return User{}, pkgErrors.ErrNotFound
+		}
+		return User{}, err
+	}
+
+	return user, nil
 }
