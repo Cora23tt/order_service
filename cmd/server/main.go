@@ -1,13 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 	"go.uber.org/dig"
 
 	authRepo "github.com/Cora23tt/order_service/internal/repository/auth"
@@ -29,24 +29,20 @@ import (
 )
 
 func main() {
-	var (
-		port = "9999"
-		host = "0.0.0.0"
-		dsn  = "postgres://postgres:postgres@localhost:5432/servicedb"
-	)
-
-	if err := execute(host, port, dsn); err != nil {
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("Error loading .env file, using default environment variables:", err)
+	}
+	if err := execute(); err != nil {
 		log.Println(err)
 		os.Exit(1)
 	}
 }
 
-func execute(host, port, dsn string) error {
+func execute() error {
 	deps := []any{
 		logger.New,
-		func() (*pgxpool.Pool, error) {
-			return db.NewDB(dsn)
-		},
+		db.NewDB,
 
 		gin.New,
 		middleware.New,
@@ -63,30 +59,27 @@ func execute(host, port, dsn string) error {
 		productHandler.NewHandler,
 		productService.NewService,
 
-		rest.NewServer,
-
-		func(server *rest.Server) *http.Server {
-			return &http.Server{
-				Addr:    net.JoinHostPort(host, port),
-				Handler: server,
-			}
-		},
+		rest.NewRESTServer,
+		rest.NewHTTPServer,
 	}
 
 	container := dig.New()
 	for _, dep := range deps {
 		if err := container.Provide(dep); err != nil {
-			return err
+			return fmt.Errorf("failed to provide dependency: %w", err)
 		}
 	}
 
-	if err := container.Invoke(func(server *rest.Server) {
-		server.Init()
-	}); err != nil {
-		return err
+	err := container.Invoke(
+		func(server *rest.Server) {
+			server.SetupRoutes()
+		})
+	if err != nil {
+		return fmt.Errorf("failed to initialize routes: %w", err)
 	}
 
-	return container.Invoke(func(server *http.Server) error {
-		return server.ListenAndServe()
-	})
+	return container.Invoke(
+		func(server *http.Server) error {
+			return fmt.Errorf("failed to start server: %w", server.ListenAndServe())
+		})
 }

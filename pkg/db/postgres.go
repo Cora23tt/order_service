@@ -3,11 +3,17 @@ package db
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func NewDB(dsn string) (*pgxpool.Pool, error) {
+func NewDB() (*pgxpool.Pool, error) {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		return nil, fmt.Errorf("DATABASE_URL is not set")
+	}
+
 	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse dsn: %w", err)
@@ -23,7 +29,7 @@ func NewDB(dsn string) (*pgxpool.Pool, error) {
 	}
 
 	if err := InitAllSchemas(context.Background(), pool); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize schemas: %w", err)
 	}
 
 	return pool, nil

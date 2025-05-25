@@ -1,8 +1,11 @@
 package rest
 
 import (
-	"github.com/Cora23tt/order_service/internal/rest/handlers/product"
+	"net"
 	"net/http"
+	"os"
+
+	"github.com/Cora23tt/order_service/internal/rest/handlers/product"
 
 	"github.com/gin-gonic/gin"
 
@@ -11,30 +14,37 @@ import (
 	"github.com/Cora23tt/order_service/internal/rest/middleware"
 )
 
-func NewServer(mux *gin.Engine, auth *auth.Handler,
+type Server struct {
+	mux        *gin.Engine
+	order      *order.Handler
+	auth       *auth.Handler
+	product    *product.Handler
+	middleware *middleware.Middleware
+}
+
+func NewRESTServer(mux *gin.Engine, auth *auth.Handler,
 	order *order.Handler, mdlwr *middleware.Middleware,
 	product *product.Handler) *Server {
 	return &Server{
-		mux:   mux,
-		order: order,
-		auth:  auth,
-		m:     mdlwr,
+		mux:        mux,
+		order:      order,
+		auth:       auth,
+		middleware: mdlwr,
 	}
 }
 
-type Server struct {
-	mux     *gin.Engine
-	order   *order.Handler
-	auth    *auth.Handler
-	product *product.Handler
-	m       *middleware.Middleware
+func NewHTTPServer(s *Server) *http.Server {
+	return &http.Server{
+		Addr:    net.JoinHostPort(os.Getenv("HOST"), os.Getenv("PORT")),
+		Handler: s.mux,
+	}
 }
 
-func (s *Server) Init() {
+func (s *Server) SetupRoutes() {
 	const baseUrl = "/api/v1"
 
 	s.mux.Use(gin.Recovery())
-	s.mux.Use(s.m.ZapLogger())
+	s.mux.Use(s.middleware.ZapLogger())
 
 	publicGroup := s.mux.Group(baseUrl + "/public")
 	{
@@ -42,7 +52,7 @@ func (s *Server) Init() {
 		publicGroup.POST("/signup", s.auth.SignUp)
 	}
 
-	secureGroup := s.mux.Group(baseUrl + "/secure").Use(s.m.Auth())
+	secureGroup := s.mux.Group(baseUrl + "/secure").Use(s.middleware.Auth())
 	{
 		secureGroup.GET("/me", s.auth.Me)
 
@@ -60,8 +70,4 @@ func (s *Server) Init() {
 		productGroup.DELETE("/:id", s.product.DeleteProduct)
 		productGroup.PUT("/:id", s.product.UpdateProduct)
 	}
-}
-
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.mux.ServeHTTP(w, r)
 }
