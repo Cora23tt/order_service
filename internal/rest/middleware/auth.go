@@ -1,43 +1,44 @@
 package middleware
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 
-	pkgErrors "github.com/Cora23tt/order_service/pkg/errors"
+	"slices"
 
 	"github.com/gin-gonic/gin"
 )
 
 type AuthValidator interface {
-	Validate(username, password string) (bool, error)
+	Validate(token string) (userID int64, role string, err error)
 }
 
-func (m *Middleware) Auth() gin.HandlerFunc {
+func (m *Middleware) AuthWithRoles(allowedRoles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tokenString := c.GetHeader("Authorization")
-
-		token := strings.TrimPrefix(tokenString, "Bearer ")
-
-		UserID, err := m.authService.GetUserID(c, token)
-		if err != nil {
-			statusCode := http.StatusUnauthorized
-			errorMessage := "unauthorized"
-
-			if errors.Is(err, pkgErrors.ErrNotFound) {
-				m.logger.Errorw("user not found", "error", err)
-			} else {
-				m.logger.Errorw("failed to get user id", "error", err)
-			}
-
-			c.JSON(statusCode, gin.H{"error": errorMessage})
+		tokenString := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
+		if tokenString == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing token"})
 			c.Abort()
 			return
 		}
 
-		c.Set("userID", UserID)
+		userID, role, err := m.validator.Validate(tokenString)
+		if err != nil {
+			m.logger.Errorw("token parse error", "err", err)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			c.Abort()
+			return
+		}
+
+		if !slices.Contains(allowedRoles, role) {
+			m.logger.Warnw("forbidden access", "userID", userID, "role", role)
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			c.Abort()
+			return
+		}
+
+		c.Set("userID", userID)
+		c.Set("role", role)
 		c.Next()
 	}
-
 }

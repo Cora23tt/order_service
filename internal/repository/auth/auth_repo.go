@@ -24,11 +24,12 @@ type User struct {
 	CreatedAt      time.Time
 	PhoneNumber    string
 	HashedPassword string
-	ID             int
+	Role           string
+	ID             int64
 }
 
-func (r *Repo) Create(ctx context.Context, user *User) (int, error) {
-	userID := 0
+func (r *Repo) Create(ctx context.Context, user *User) (int64, error) {
+	var userID int64 = 0
 	err := r.db.QueryRow(ctx, `
         INSERT INTO users (phone_number, password_hash)
         VALUES ($1, $2)
@@ -60,8 +61,8 @@ func (r *Repo) GetByPhoneNumber(ctx context.Context, phoneNumber string) (*User,
 	return &user, nil
 }
 
-func (r *Repo) GetUserID(ctx context.Context, token string) (string, error) {
-	var userID string
+func (r *Repo) GetUserID(ctx context.Context, token string) (int64, error) {
+	var userID int64
 	err := r.db.QueryRow(ctx, `
 		SELECT user_id
 		FROM sessions
@@ -69,14 +70,14 @@ func (r *Repo) GetUserID(ctx context.Context, token string) (string, error) {
 	`, token).Scan(&userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return "", pkgErrors.ErrNotFound
+			return 0, pkgErrors.ErrNotFound
 		}
-		return "", err
+		return 0, err
 	}
 	return userID, nil
 }
 
-func (r *Repo) StoreSessionToken(ctx context.Context, token, userID string) error {
+func (r *Repo) StoreSessionToken(ctx context.Context, token string, userID int64) error {
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO sessions (token, user_id)
 		VALUES ($1, $2)
@@ -90,10 +91,10 @@ func (r *Repo) StoreSessionToken(ctx context.Context, token, userID string) erro
 func (r *Repo) GetUser(ctx context.Context, phoneNumber string) (User, error) {
 	var user User
 	err := r.db.QueryRow(ctx, `
-		SELECT id, phone_number, password_hash
+		SELECT id, phone_number, password_hash, role
 		FROM users
 		WHERE phone_number = $1
-	`, phoneNumber).Scan(&user.ID, &user.PhoneNumber, &user.HashedPassword)
+	`, phoneNumber).Scan(&user.ID, &user.PhoneNumber, &user.HashedPassword, &user.Role)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return User{}, pkgErrors.ErrNotFound

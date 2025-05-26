@@ -31,11 +31,12 @@ func NewService(r *auth.Repo) *Service {
 }
 
 type tokenClaims struct {
+	UserID int64  `json:"user_id"`
+	Role   string `json:"role"`
 	jwt.StandardClaims
-	UserId int `json:"user_id"`
 }
 
-func (s *Service) CreateUser(ctx context.Context, phoneNumber, password string) (int, error) {
+func (s *Service) CreateUser(ctx context.Context, phoneNumber, password string) (int64, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return 0, fmt.Errorf("failed to hash password: %w", err)
@@ -53,17 +54,11 @@ func (s *Service) CreateUser(ctx context.Context, phoneNumber, password string) 
 	return userID, err
 }
 
-func (s *Service) Validate(ctx context.Context, username, password string) (bool, error) {
-	user, err := s.repo.GetUser(ctx, username)
-	if err != nil {
-		return false, err
-	}
-
-	err = bcrypt.CompareHashAndPassword([]byte(user.HashedPassword), []byte(password))
-	return err == nil, nil
+func (s *Service) Validate(token string) (int64, string, error) {
+	return s.ParseToken(token)
 }
 
-func (s *Service) GetUserID(ctx context.Context, token string) (string, error) {
+func (s *Service) GetUserID(ctx context.Context, token string) (int64, error) {
 	return s.repo.GetUserID(ctx, token)
 }
 
@@ -72,25 +67,48 @@ func (s *Service) GenerateJWT(ctx context.Context, phoneNumber, password string)
 	if err != nil {
 		if errors.Is(err, pkgerrors.ErrNotFound) {
 			return "", pkgerrors.ErrNotFound
-		} else {
-			return "", pkgerrors.ErrInternal
 		}
+		return "", pkgerrors.ErrInternal
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.HashedPassword), []byte(password)); err != nil {
 		return "", pkgerrors.ErrInvalidCredentials
 	}
 
-	token := jwt.NewWithClaims(
-		jwt.SigningMethodHS256,
-		tokenClaims{
-			StandardClaims: jwt.StandardClaims{
-				ExpiresAt: &jwt.Time{Time: time.Now().Add(tokenTTL)},
-				IssuedAt:  &jwt.Time{Time: time.Now()},
-			},
-			UserId: user.ID,
+	claims := tokenClaims{
+		UserID: user.ID,
+		Role:   user.Role,
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: &jwt.Time{Time: time.Now().Add(tokenTTL)},
+			IssuedAt:  &jwt.Time{Time: time.Now()},
 		},
-	)
+	}
 
-	return token.SignedString([]byte(os.Getenv("JWT_SECRET")))
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		return "", fmt.Errorf("JWT_SECRET not set")
+	}
+
+	return token.SignedString([]byte(secret))
+}
+
+func (s *Service) ParseToken(tokenStr string) (int64, string, error) {
+	claims := &tokenClaims{}
+
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		return 0, "", fmt.Errorf("JWT_SECRET not set")
+	}
+
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(secret), nil
+	})
+
+	if err != nil || !token.Valid {
+		return 0, "", fmt.Errorf("invalid token: %w", err)
+	}
+
+	return claims.UserID, claims.Role, nil
 }
