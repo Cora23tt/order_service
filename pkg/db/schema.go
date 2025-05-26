@@ -21,6 +21,11 @@ func InitAllSchemas(ctx context.Context, db *pgxpool.Pool) error {
 		);
 		`,
 		`
+		INSERT INTO users (role, phone_number, password_hash)
+		VALUES ('admin', 'admin123', '$2a$10$adKovmcwFocIAq1ut4IlXuJA83pvaCQyMiiSYwwDesAiLPD4lXxce')
+		ON CONFLICT (phone_number) DO NOTHING;
+		`,
+		`
 		CREATE TABLE IF NOT EXISTS products (
 			id SERIAL PRIMARY KEY,
 			name VARCHAR(255) NOT NULL,

@@ -1,18 +1,17 @@
 package middleware
 
 import (
-	"github.com/Cora23tt/order_service/internal/usecase/auth"
 	"go.uber.org/zap"
 )
 
 type Middleware struct {
-	logger      *zap.SugaredLogger
-	authService *auth.Service
+	logger    *zap.SugaredLogger
+	validator AuthValidator
 }
 
-func New(logger *zap.SugaredLogger, authService *auth.Service) *Middleware {
+func New(logger *zap.SugaredLogger, validator AuthValidator) *Middleware {
 	return &Middleware{
-		logger:      logger,
-		authService: authService,
+		logger:    logger,
+		validator: validator,
 	}
 }

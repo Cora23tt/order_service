@@ -44,6 +44,7 @@ func execute() error {
 		logger.New,
 		db.NewDB,
 		gin.New,
+		func(s *authService.Service) middleware.AuthValidator { return s },
 		middleware.New,
 
 		authHandler.NewHandler,

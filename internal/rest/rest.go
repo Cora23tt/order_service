@@ -52,7 +52,7 @@ func (s *Server) SetupRoutes() {
 		publicGroup.POST("/signup", s.auth.SignUp)
 	}
 
-	secureGroup := s.mux.Group(baseUrl + "/secure").Use(s.middleware.Auth())
+	secureGroup := s.mux.Group(baseUrl+"/secure", s.middleware.AuthWithRoles("user", "admin"))
 	{
 		secureGroup.POST("/orders", s.order.Create)
 		secureGroup.GET("/orders", s.order.GetAll)
