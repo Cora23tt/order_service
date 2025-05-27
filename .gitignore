@@ -29,3 +29,6 @@ coverage.html
 
 # vscide DB extension sessions
 *.session.sql
+
+# profile images
+/web/avatars/*
