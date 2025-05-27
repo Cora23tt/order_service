@@ -24,12 +24,19 @@ func (s *Service) AddProduct(ctx context.Context, price int64, quantity int, nam
 	}
 	return s.repo.CreateProduct(ctx, &product)
 }
+
 func (s *Service) DeleteProduct(ctx context.Context, id int) error {
 	return s.repo.DeleteProduct(ctx, id)
 }
+
 func (s *Service) GetProductByID(ctx context.Context, id int) (*productRepo.Product, error) {
-	return s.repo.GetProductByID(ctx, id)
+	product, err := s.repo.GetProductByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return product, nil
 }
+
 func (s *Service) GetProducts(ctx context.Context) ([]*productRepo.Product, error) {
 	return s.repo.GetProducts(ctx)
 }

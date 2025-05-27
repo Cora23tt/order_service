@@ -14,6 +14,10 @@ import (
 	authHandler "github.com/Cora23tt/order_service/internal/rest/handlers/auth"
 	authService "github.com/Cora23tt/order_service/internal/usecase/auth"
 
+	userRepo "github.com/Cora23tt/order_service/internal/repository/user"
+	userHandler "github.com/Cora23tt/order_service/internal/rest/handlers/user"
+	userService "github.com/Cora23tt/order_service/internal/usecase/user"
+
 	orderRepo "github.com/Cora23tt/order_service/internal/repository/order"
 	orderHandler "github.com/Cora23tt/order_service/internal/rest/handlers/order"
 	orderService "github.com/Cora23tt/order_service/internal/usecase/order"
@@ -50,6 +54,10 @@ func execute() error {
 		authHandler.NewHandler,
 		authRepo.NewRepo,
 		authService.NewService,
+
+		userRepo.NewRepo,
+		userService.NewService,
+		userHandler.NewHandler,
 
 		orderRepo.NewRepo,
 		orderService.NewService,
