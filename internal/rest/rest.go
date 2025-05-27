@@ -54,6 +54,8 @@ func (s *Server) SetupRoutes() {
 	s.mux.Use(gin.Recovery())
 	s.mux.Use(s.middleware.ZapLogger())
 
+	s.mux.GET("/profile/:id/photo", s.user.GetProfilePhoto)
+
 	authGroup := s.mux.Group(baseUrl + "/auth")
 	{
 		authGroup.POST("/signin", s.auth.SignIn)
@@ -65,7 +67,6 @@ func (s *Server) SetupRoutes() {
 		userGroup.GET("/", s.user.GetProfile)
 		userGroup.PATCH("/", s.user.UpdateProfile)
 	}
-
 	adminUserGroup := s.mux.Group(baseUrl+"/admin/users", s.middleware.AuthWithRoles("admin"))
 	{
 		adminUserGroup.GET("/", s.user.ListUsers)
@@ -76,8 +77,11 @@ func (s *Server) SetupRoutes() {
 		ordersGroup.POST("/", s.order.Create)
 		ordersGroup.GET("/", s.order.GetAll)
 		ordersGroup.GET("/:id", s.order.GetByID)
-		ordersGroup.PUT("/:id", s.order.Update)
-		ordersGroup.DELETE("/:id", s.order.Delete)
+	}
+	adminOrdersGroup := s.mux.Group(baseUrl+"/orders", s.middleware.AuthWithRoles("admin"))
+	{
+		adminOrdersGroup.PUT("/:id", s.order.Update)
+		adminOrdersGroup.DELETE("/:id", s.order.Delete)
 	}
 
 	publicProductGroup := s.mux.Group(baseUrl + "/products")
