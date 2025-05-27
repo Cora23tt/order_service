@@ -2,7 +2,10 @@ package user
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/Cora23tt/order_service/internal/usecase/user"
 	pkgerrors "github.com/Cora23tt/order_service/pkg/errors"
@@ -41,6 +44,20 @@ func (h *Handler) GetProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, profile)
 }
 
+func (h *Handler) GetProfilePhoto(c *gin.Context) {
+	id := c.Param("id")
+	exts := []string{".jpg", ".jpeg", ".png", ".webp"}
+	for _, ext := range exts {
+		path := fmt.Sprintf("web/avatars/%s/profile%s", id, ext)
+		if _, err := os.Stat(path); err == nil {
+			c.File(path)
+			return
+		}
+	}
+
+	c.JSON(http.StatusNotFound, gin.H{"error": "photo not found"})
+}
+
 type UpdateProfileRequest struct {
 	PINFL     *string `json:"pinfl,omitempty"`
 	AvatarURL *string `json:"avatar_url,omitempty"`
@@ -54,13 +71,41 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 	}
 	userID := userIDRaw.(int64)
 
-	var req UpdateProfileRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
-		return
+	var pinfl string
+	if val := c.PostForm("pinfl"); val != "" {
+		pinfl = val
 	}
 
-	if err := h.service.UpdateProfile(c.Request.Context(), userID, req.PINFL, req.AvatarURL); err != nil {
+	file, err := c.FormFile("avatar")
+	var avatarPath *string
+	if err == nil {
+		ext := filepath.Ext(file.Filename)
+		baseDir := filepath.Join(".", "web", "avatars", fmt.Sprintf("%d", userID))
+
+		if err := os.MkdirAll(baseDir, os.ModePerm); err != nil {
+			h.log.Errorw("failed to create avatar dir", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot create folder"})
+			return
+		}
+
+		filename := "profile" + ext
+		fullPath := filepath.Join(baseDir, filename)
+
+		if err := c.SaveUploadedFile(file, fullPath); err != nil {
+			h.log.Errorw("failed to save avatar", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot save file"})
+			return
+		}
+		url := fmt.Sprintf("/profile/%d/photo", userID)
+		avatarPath = &url
+	}
+
+	var pinflPtr *string
+	if pinfl != "" {
+		pinflPtr = &pinfl
+	}
+
+	if err := h.service.UpdateProfile(c.Request.Context(), userID, pinflPtr, avatarPath); err != nil {
 		if errors.Is(err, pkgerrors.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 			return

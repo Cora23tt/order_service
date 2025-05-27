@@ -33,7 +33,7 @@ import (
 )
 
 func main() {
-	err := godotenv.Load("../../.env")
+	err := godotenv.Load()
 	if err != nil {
 		log.Println("Error loading .env file, using default environment variables:", err)
 	}
