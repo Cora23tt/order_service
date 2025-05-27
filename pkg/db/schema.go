@@ -16,6 +16,7 @@ func InitAllSchemas(ctx context.Context, db *pgxpool.Pool) error {
 			phone_number VARCHAR(20) NOT NULL UNIQUE,
 			pinfl VARCHAR(14),
 			password_hash TEXT NOT NULL,
+			avatar_url TEXT,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);

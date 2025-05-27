@@ -5,30 +5,38 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/Cora23tt/order_service/internal/rest/handlers/product"
-
 	"github.com/gin-gonic/gin"
 
 	"github.com/Cora23tt/order_service/internal/rest/handlers/auth"
 	"github.com/Cora23tt/order_service/internal/rest/handlers/order"
+	"github.com/Cora23tt/order_service/internal/rest/handlers/product"
+	"github.com/Cora23tt/order_service/internal/rest/handlers/user"
 	"github.com/Cora23tt/order_service/internal/rest/middleware"
 )
 
 type Server struct {
 	mux        *gin.Engine
-	order      *order.Handler
 	auth       *auth.Handler
+	order      *order.Handler
 	product    *product.Handler
+	user       *user.Handler
 	middleware *middleware.Middleware
 }
 
-func NewRESTServer(mux *gin.Engine, auth *auth.Handler,
-	order *order.Handler, mdlwr *middleware.Middleware,
-	product *product.Handler) *Server {
+func NewRESTServer(
+	mux *gin.Engine,
+	auth *auth.Handler,
+	order *order.Handler,
+	mdlwr *middleware.Middleware,
+	product *product.Handler,
+	user *user.Handler,
+) *Server {
 	return &Server{
 		mux:        mux,
-		order:      order,
 		auth:       auth,
+		order:      order,
+		product:    product,
+		user:       user,
 		middleware: mdlwr,
 	}
 }
@@ -46,26 +54,41 @@ func (s *Server) SetupRoutes() {
 	s.mux.Use(gin.Recovery())
 	s.mux.Use(s.middleware.ZapLogger())
 
-	publicGroup := s.mux.Group(baseUrl + "/public")
+	authGroup := s.mux.Group(baseUrl + "/auth")
 	{
-		publicGroup.POST("/signin", s.auth.SignIn)
-		publicGroup.POST("/signup", s.auth.SignUp)
+		authGroup.POST("/signin", s.auth.SignIn)
+		authGroup.POST("/signup", s.auth.SignUp)
 	}
 
-	secureGroup := s.mux.Group(baseUrl+"/secure", s.middleware.AuthWithRoles("user", "admin"))
+	userGroup := s.mux.Group(baseUrl+"/me", s.middleware.AuthWithRoles("user", "admin"))
 	{
-		secureGroup.POST("/orders", s.order.Create)
-		secureGroup.GET("/orders", s.order.GetAll)
-		secureGroup.GET("/orders/:id", s.order.GetByID)
-		secureGroup.PUT("/orders/:id", s.order.Update)
-		secureGroup.DELETE("/orders/:id", s.order.Delete)
+		userGroup.GET("/", s.user.GetProfile)
+		userGroup.PATCH("/", s.user.UpdateProfile)
 	}
-	productGroup := s.mux.Group(baseUrl + "/products")
+
+	adminUserGroup := s.mux.Group(baseUrl+"/admin/users", s.middleware.AuthWithRoles("admin"))
 	{
-		productGroup.POST("/", s.product.AddProduct)
-		productGroup.GET("/", s.product.GetProducts)
-		productGroup.GET("/:id", s.product.GetProduct)
-		productGroup.DELETE("/:id", s.product.DeleteProduct)
-		productGroup.PUT("/:id", s.product.UpdateProduct)
+		adminUserGroup.GET("/", s.user.ListUsers)
+	}
+
+	ordersGroup := s.mux.Group(baseUrl+"/orders", s.middleware.AuthWithRoles("user", "admin"))
+	{
+		ordersGroup.POST("/", s.order.Create)
+		ordersGroup.GET("/", s.order.GetAll)
+		ordersGroup.GET("/:id", s.order.GetByID)
+		ordersGroup.PUT("/:id", s.order.Update)
+		ordersGroup.DELETE("/:id", s.order.Delete)
+	}
+
+	publicProductGroup := s.mux.Group(baseUrl + "/products")
+	{
+		publicProductGroup.GET("/", s.product.GetProducts)
+		publicProductGroup.GET("/:id", s.product.GetProduct)
+	}
+	adminProductGroup := s.mux.Group(baseUrl+"/products", s.middleware.AuthWithRoles("admin"))
+	{
+		adminProductGroup.POST("/", s.product.AddProduct)
+		adminProductGroup.PUT("/:id", s.product.UpdateProduct)
+		adminProductGroup.DELETE("/:id", s.product.DeleteProduct)
 	}
 }
