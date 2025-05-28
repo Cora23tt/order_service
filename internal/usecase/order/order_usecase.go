@@ -2,13 +2,11 @@ package order
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"time"
 
 	repo "github.com/Cora23tt/order_service/internal/repository/order"
 	"github.com/Cora23tt/order_service/pkg/enums"
-	pkgerrors "github.com/Cora23tt/order_service/pkg/errors"
+	"github.com/Cora23tt/order_service/pkg/errors"
 )
 
 type Service struct {
@@ -33,7 +31,7 @@ type OrderItemInput struct {
 }
 
 func (s *Service) CreateOrder(ctx context.Context, input CreateOrderInput) (int64, error) {
-	var total int64 = 0
+	var total int64
 	for _, item := range input.Items {
 		total += item.Price * item.Quantity
 	}
@@ -57,10 +55,12 @@ func (s *Service) CreateOrder(ctx context.Context, input CreateOrderInput) (int6
 
 	orderID, err := s.repo.Create(ctx, order)
 	if err != nil {
-		if err == pkgerrors.ErrInvalidInput {
-			return 0, pkgerrors.ErrInvalidInput
+		switch err {
+		case errors.ErrInvalidInput, errors.ErrAlreadyExists:
+			return 0, err
+		default:
+			return 0, errors.ErrInternal
 		}
-		return 0, pkgerrors.ErrInternal
 	}
 
 	return orderID, nil
@@ -69,42 +69,74 @@ func (s *Service) CreateOrder(ctx context.Context, input CreateOrderInput) (int6
 func (s *Service) GetOrderByID(ctx context.Context, orderID int64) (*repo.Order, error) {
 	order, err := s.repo.GetByID(ctx, orderID)
 	if err != nil {
-		if err == pkgerrors.ErrNotFound {
-			return nil, pkgerrors.ErrNotFound
+		switch err {
+		case errors.ErrNotFound:
+			return nil, err
+		default:
+			return nil, errors.ErrInternal
 		}
-		return nil, fmt.Errorf("get order by id: %w", err)
 	}
 	return order, nil
 }
 
 func (s *Service) GetUserOrders(ctx context.Context, userID int64) ([]*repo.Order, error) {
-	return s.repo.GetAllByUser(ctx, userID)
+	orders, err := s.repo.GetAllByUser(ctx, userID)
+	if err != nil {
+		return nil, errors.ErrInternal
+	}
+	return orders, nil
 }
 
 func (s *Service) AdminUpdateOrderStatus(ctx context.Context, orderID int64, status string) error {
-	return s.repo.UpdateStatus(ctx, orderID, status)
+	err := s.repo.UpdateStatus(ctx, orderID, status)
+	switch err {
+	case nil:
+		return nil
+	case errors.ErrNotFound, errors.ErrInvalidInput:
+		return err
+	default:
+		return errors.ErrInternal
+	}
 }
 
 func (s *Service) DeleteOrder(ctx context.Context, orderID int64) error {
-	return s.repo.Delete(ctx, orderID)
+	err := s.repo.Delete(ctx, orderID)
+	switch err {
+	case nil:
+		return nil
+	case errors.ErrNotFound:
+		return err
+	default:
+		return errors.ErrInternal
+	}
 }
 
 func (s *Service) CancelOrder(ctx context.Context, orderID, userID int64) error {
 	order, err := s.repo.GetByID(ctx, orderID)
 	if err != nil {
-		if errors.Is(err, pkgerrors.ErrNotFound) {
-			return pkgerrors.ErrNotFound
+		switch err {
+		case errors.ErrNotFound:
+			return err
+		default:
+			return errors.ErrInternal
 		}
-		return fmt.Errorf("get order by id: %w", err)
 	}
 
 	if order.UserID != userID {
-		return pkgerrors.ErrUnauthorized
+		return errors.ErrUnauthorized
 	}
 
 	if order.Status != enums.StatusPendingPayment {
-		return pkgerrors.ErrInvalidInput // нельзя отменить заказ
+		return errors.ErrInvalidInput // отмена невозможна
 	}
 
-	return s.repo.UpdateStatus(ctx, orderID, "cancelled")
+	err = s.repo.UpdateStatus(ctx, orderID, "cancelled")
+	switch err {
+	case nil:
+		return nil
+	case errors.ErrNotFound, errors.ErrInvalidInput:
+		return err
+	default:
+		return errors.ErrInternal
+	}
 }
