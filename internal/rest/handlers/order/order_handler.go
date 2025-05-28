@@ -37,7 +37,7 @@ func (h *Handler) Create(c *gin.Context) {
 
 	var req CreateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		h.log.Warnw("invalid create order", "error", err)
+		h.log.Warnw("invalid create order request", "userID", userID, "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
 		return
 	}
@@ -51,10 +51,10 @@ func (h *Handler) Create(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, pkgerrors.ErrInvalidInput):
-			h.log.Warnw("invalid input for order creation", "userID", userID, "error", err)
+			h.log.Warnw("invalid data for order creation", "userID", userID, "error", err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user or product"})
 		default:
-			h.log.Errorw("failed to create order", "userID", userID, "error", err)
+			h.log.Errorw("internal error during order creation", "userID", userID, "error", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		}
 		return
@@ -66,22 +66,21 @@ func (h *Handler) Create(c *gin.Context) {
 func (h *Handler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
+		h.log.Warnw("invalid order id", "param", c.Param("id"), "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order id"})
 		return
 	}
 
 	order, err := h.service.GetOrderByID(c.Request.Context(), id)
-	if err != nil {
-		if errors.Is(err, pkgerrors.ErrNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
-			return
-		}
-		h.log.Errorw("get order failed", "id", id, "error", err)
+	switch {
+	case errors.Is(err, pkgerrors.ErrNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+	case err != nil:
+		h.log.Errorw("get order by id failed", "id", id, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
-		return
+	default:
+		c.JSON(http.StatusOK, order)
 	}
-
-	c.JSON(http.StatusOK, order)
 }
 
 func (h *Handler) GetAll(c *gin.Context) {
@@ -94,7 +93,7 @@ func (h *Handler) GetAll(c *gin.Context) {
 
 	orders, err := h.service.GetUserOrders(c.Request.Context(), userID)
 	if err != nil {
-		h.log.Errorw("get orders failed", "userID", userID, "error", err)
+		h.log.Errorw("get user orders failed", "userID", userID, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
@@ -109,58 +108,56 @@ type UpdateStatusRequest struct {
 func (h *Handler) Update(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
+		h.log.Warnw("invalid order id", "param", c.Param("id"), "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order id"})
 		return
 	}
 
 	var req UpdateStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		h.log.Warnw("invalid input for update", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
 		return
 	}
 
 	err = h.service.AdminUpdateOrderStatus(c.Request.Context(), id, req.Status)
-	if err != nil {
-		switch {
-		case errors.Is(err, pkgerrors.ErrNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
-			return
-		case errors.Is(err, pkgerrors.ErrInvalidInput):
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid status change"})
-			return
-		default:
-			h.log.Errorw("update order failed", "id", id, "error", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
-			return
-		}
+	switch {
+	case errors.Is(err, pkgerrors.ErrNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+	case errors.Is(err, pkgerrors.ErrInvalidInput):
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid status"})
+	case err != nil:
+		h.log.Errorw("update order failed", "id", id, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+	default:
+		c.JSON(http.StatusOK, gin.H{"message": "status updated"})
 	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "status updated"})
 }
 
 func (h *Handler) Delete(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
+		h.log.Warnw("invalid order id", "param", c.Param("id"), "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order id"})
 		return
 	}
 
-	if err := h.service.DeleteOrder(c.Request.Context(), id); err != nil {
-		if errors.Is(err, pkgerrors.ErrNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
-			return
-		}
+	err = h.service.DeleteOrder(c.Request.Context(), id)
+	switch {
+	case errors.Is(err, pkgerrors.ErrNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+	case err != nil:
 		h.log.Errorw("delete order failed", "id", id, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
-		return
+	default:
+		c.Status(http.StatusNoContent)
 	}
-
-	c.Status(http.StatusNoContent)
 }
 
 func (h *Handler) Cancel(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
+		h.log.Warnw("invalid order id", "param", c.Param("id"), "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order id"})
 		return
 	}
@@ -172,19 +169,18 @@ func (h *Handler) Cancel(c *gin.Context) {
 	}
 	userID := userIDRaw.(int64)
 
-	if err := h.service.CancelOrder(c.Request.Context(), id, userID); err != nil {
-		if errors.Is(err, pkgerrors.ErrNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
-			return
-		}
-		if errors.Is(err, pkgerrors.ErrUnauthorized) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-			return
-		}
+	err = h.service.CancelOrder(c.Request.Context(), id, userID)
+	switch {
+	case errors.Is(err, pkgerrors.ErrNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+	case errors.Is(err, pkgerrors.ErrUnauthorized):
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+	case errors.Is(err, pkgerrors.ErrInvalidInput):
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cancel not allowed"})
+	case err != nil:
 		h.log.Errorw("cancel order failed", "id", id, "userID", userID, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
-		return
+	default:
+		c.JSON(http.StatusOK, gin.H{"message": "order cancelled"})
 	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "order cancelled"})
 }
