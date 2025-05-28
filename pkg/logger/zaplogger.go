@@ -27,9 +27,20 @@ func New() (*zap.SugaredLogger, error) {
 	}
 
 	cfg := zap.Config{
-		Level:       zap.NewAtomicLevelAt(lvl),
-		Development: true,
-		Encoding:    "console",
+		Level:            zap.NewAtomicLevelAt(lvl),
+		Development:      true,
+		Encoding:         "console",
+		OutputPaths:      []string{"stdout"},
+		ErrorOutputPaths: []string{"stderr"},
+		EncoderConfig: zapcore.EncoderConfig{
+			MessageKey:   "msg",
+			LevelKey:     "level",
+			TimeKey:      "ts",
+			CallerKey:    "caller",
+			EncodeLevel:  zapcore.CapitalColorLevelEncoder,
+			EncodeTime:   zapcore.ISO8601TimeEncoder,
+			EncodeCaller: zapcore.ShortCallerEncoder,
+		},
 	}
 
 	zapLogger, err := cfg.Build()

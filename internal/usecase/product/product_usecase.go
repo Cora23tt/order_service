@@ -2,8 +2,9 @@ package product
 
 import (
 	"context"
-	productRepo "github.com/Cora23tt/order_service/internal/repository/product"
 	"time"
+
+	productRepo "github.com/Cora23tt/order_service/internal/repository/product"
 )
 
 type Service struct {
@@ -14,7 +15,7 @@ func NewService(repo *productRepo.Repo) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) AddProduct(ctx context.Context, price int64, quantity int, name, description, imageURL string) error {
+func (s *Service) AddProduct(ctx context.Context, price int64, quantity int64, name, description, imageURL string) error {
 	product := productRepo.Product{
 		Name:          name,
 		Price:         price,
@@ -25,11 +26,11 @@ func (s *Service) AddProduct(ctx context.Context, price int64, quantity int, nam
 	return s.repo.CreateProduct(ctx, &product)
 }
 
-func (s *Service) DeleteProduct(ctx context.Context, id int) error {
+func (s *Service) DeleteProduct(ctx context.Context, id int64) error {
 	return s.repo.DeleteProduct(ctx, id)
 }
 
-func (s *Service) GetProductByID(ctx context.Context, id int) (*productRepo.Product, error) {
+func (s *Service) GetProductByID(ctx context.Context, id int64) (*productRepo.Product, error) {
 	product, err := s.repo.GetProductByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -40,7 +41,7 @@ func (s *Service) GetProductByID(ctx context.Context, id int) (*productRepo.Prod
 func (s *Service) GetProducts(ctx context.Context) ([]*productRepo.Product, error) {
 	return s.repo.GetProducts(ctx)
 }
-func (s *Service) UpdateProduct(ctx context.Context, id int, quantity int, price int64, name, description, imageUrl string) error {
+func (s *Service) UpdateProduct(ctx context.Context, id int64, quantity int64, price int64, name, description, imageUrl string) error {
 	product, err := s.repo.GetProductByID(ctx, id)
 	if err != nil {
 		return err

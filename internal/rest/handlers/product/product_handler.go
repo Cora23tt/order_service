@@ -26,7 +26,7 @@ type Product struct {
 	Description string `json:"description"`
 	ImageURL    string `json:"image_url"`
 	Price       int64  `json:"price" binding:"required,gte=0"`
-	Quantity    int    `json:"quantity" binding:"required,gte=0"`
+	Quantity    int64  `json:"quantity" binding:"required,gte=0"`
 }
 
 func (h *Handler) AddProduct(c *gin.Context) {
@@ -47,7 +47,7 @@ func (h *Handler) AddProduct(c *gin.Context) {
 }
 
 func (h *Handler) UpdateProduct(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		h.log.Warnw("invalid product id", "raw", c.Param("id"))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
@@ -76,7 +76,7 @@ func (h *Handler) UpdateProduct(c *gin.Context) {
 }
 
 func (h *Handler) DeleteProduct(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		h.log.Warnw("invalid product id for delete", "raw", c.Param("id"))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
@@ -99,7 +99,7 @@ func (h *Handler) DeleteProduct(c *gin.Context) {
 }
 
 func (h *Handler) GetProduct(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		h.log.Warnw("invalid product id for get", "raw", c.Param("id"))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})

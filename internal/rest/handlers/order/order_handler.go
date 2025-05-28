@@ -28,7 +28,12 @@ type CreateOrderRequest struct {
 }
 
 func (h *Handler) Create(c *gin.Context) {
-	userID := c.GetInt("userID")
+	userIDRaw, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	userID := userIDRaw.(int64)
 
 	var req CreateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -59,7 +64,7 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) GetByID(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order id"})
 		return
@@ -80,7 +85,12 @@ func (h *Handler) GetByID(c *gin.Context) {
 }
 
 func (h *Handler) GetAll(c *gin.Context) {
-	userID := c.GetInt("userID")
+	userIDRaw, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	userID := userIDRaw.(int64)
 
 	orders, err := h.service.GetUserOrders(c.Request.Context(), userID)
 	if err != nil {
@@ -97,7 +107,7 @@ type UpdateStatusRequest struct {
 }
 
 func (h *Handler) Update(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order id"})
 		return
@@ -109,21 +119,27 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.UpdateOrderStatus(c.Request.Context(), id, req.Status); err != nil {
-		if errors.Is(err, pkgerrors.ErrNotFound) {
+	err = h.service.AdminUpdateOrderStatus(c.Request.Context(), id, req.Status)
+	if err != nil {
+		switch {
+		case errors.Is(err, pkgerrors.ErrNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
 			return
+		case errors.Is(err, pkgerrors.ErrInvalidInput):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid status change"})
+			return
+		default:
+			h.log.Errorw("update order failed", "id", id, "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+			return
 		}
-		h.log.Errorw("update order failed", "id", id, "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
-		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "status updated"})
 }
 
 func (h *Handler) Delete(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order id"})
 		return
@@ -140,4 +156,35 @@ func (h *Handler) Delete(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) Cancel(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order id"})
+		return
+	}
+
+	userIDRaw, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	userID := userIDRaw.(int64)
+
+	if err := h.service.CancelOrder(c.Request.Context(), id, userID); err != nil {
+		if errors.Is(err, pkgerrors.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+			return
+		}
+		if errors.Is(err, pkgerrors.ErrUnauthorized) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
+		h.log.Errorw("cancel order failed", "id", id, "userID", userID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "order cancelled"})
 }

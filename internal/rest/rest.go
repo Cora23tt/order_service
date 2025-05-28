@@ -77,11 +77,12 @@ func (s *Server) SetupRoutes() {
 		ordersGroup.POST("/", s.order.Create)
 		ordersGroup.GET("/", s.order.GetAll)
 		ordersGroup.GET("/:id", s.order.GetByID)
+		ordersGroup.GET("/:id/cancel", s.order.Cancel)
 	}
 	adminOrdersGroup := s.mux.Group(baseUrl+"/orders", s.middleware.AuthWithRoles("admin"))
 	{
-		adminOrdersGroup.PUT("/:id", s.order.Update)
 		adminOrdersGroup.DELETE("/:id", s.order.Delete)
+		adminOrdersGroup.PUT("/:id", s.order.Update)
 	}
 
 	publicProductGroup := s.mux.Group(baseUrl + "/products")

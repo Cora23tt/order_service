@@ -2,68 +2,68 @@ package order
 
 import (
 	"context"
+	"errors"
 	"time"
 
-	"github.com/Cora23tt/order_service/pkg/errors"
+	"github.com/Cora23tt/order_service/pkg/enums"
+	pkgerrors "github.com/Cora23tt/order_service/pkg/errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.uber.org/zap"
 )
 
+type Repo struct {
+	db  *pgxpool.Pool
+	log *zap.SugaredLogger
+}
+
+func NewRepo(db *pgxpool.Pool, log *zap.SugaredLogger) *Repo {
+	return &Repo{db: db, log: log}
+}
+
 type Order struct {
-	ID           int
-	UserID       int
-	Status       string
-	DeliveryDate *time.Time
-	PickupPoint  string
-	OrderDate    time.Time
-	TotalAmount  int
-	ReceiptURL   *string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	Items        []OrderItem
+	ID           int64             `json:"id"`
+	UserID       int64             `json:"user_id"`
+	Status       enums.OrderStatus `json:"status"`
+	DeliveryDate *time.Time        `json:"delivery_date,omitempty"`
+	PickupPoint  string            `json:"pickup_point"`
+	OrderDate    time.Time         `json:"order_date"`
+	TotalAmount  int64             `json:"total_amount"`
+	ReceiptURL   *string           `json:"receipt_url,omitempty"`
+	CreatedAt    time.Time         `json:"created_at"`
+	UpdatedAt    time.Time         `json:"updated_at"`
+	Items        []OrderItem       `json:"items,omitempty"`
 }
 
 type OrderItem struct {
-	ProductID  int
-	Quantity   int
-	Price      int
-	TotalPrice int
+	ProductID  int64 `json:"product_id"`
+	Quantity   int64 `json:"quantity"`
+	Price      int64 `json:"price"`
+	TotalPrice int64 `json:"total_price"`
 }
 
-type Repo struct {
-	db *pgxpool.Pool
-}
-
-func NewRepo(db *pgxpool.Pool) *Repo {
-	return &Repo{db: db}
-}
-
-func (r *Repo) Create(ctx context.Context, o *Order) (int, error) {
+func (r *Repo) Create(ctx context.Context, o *Order) (int64, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return 0, err
+		r.log.Errorw("begin transaction failed", "error", err)
+		return 0, pkgerrors.ErrInternal
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		if err := tx.Rollback(ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+			r.log.Errorw("rollback failed", "error", err)
+		}
+	}()
 
-	var orderID int
+	var orderID int64
 	err = tx.QueryRow(ctx, `
 		INSERT INTO orders (user_id, status, delivery_date, pickup_point, total_amount)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id
 	`, o.UserID, o.Status, o.DeliveryDate, o.PickupPoint, o.TotalAmount).Scan(&orderID)
 	if err != nil {
-		if pgErr, ok := err.(*pgconn.PgError); ok {
-			switch pgErr.Code {
-			case "23503": // foreign key violation
-				return 0, errors.ErrInvalidInput
-			case "23505": // unique violation (если появится)
-				return 0, errors.ErrAlreadyExists
-			default:
-				return 0, errors.ErrInternal
-			}
-		}
-		return 0, err
+		r.log.Errorw("insert order failed", "userID", o.UserID, "error", err)
+		return 0, r.handlePgError(err, "create order")
 	}
 
 	for _, item := range o.Items {
@@ -72,50 +72,50 @@ func (r *Repo) Create(ctx context.Context, o *Order) (int, error) {
 			VALUES ($1, $2, $3, $4)
 		`, orderID, item.ProductID, item.Quantity, item.Price)
 		if err != nil {
-			if pgErr, ok := err.(*pgconn.PgError); ok {
-				if pgErr.Code == "23503" {
-					return 0, errors.ErrInvalidInput
-				}
-			}
-			return 0, err
+			r.log.Errorw("insert order item failed", "orderID", orderID, "productID", item.ProductID, "error", err)
+			return 0, r.handlePgError(err, "insert order item")
 		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return 0, err
+		r.log.Errorw("commit failed", "orderID", orderID, "error", err)
+		return 0, pkgerrors.ErrInternal
 	}
 
+	r.log.Infow("order created", "orderID", orderID, "userID", o.UserID)
 	return orderID, nil
 }
 
-func (r *Repo) GetByID(ctx context.Context, orderID int) (*Order, error) {
+func (r *Repo) GetByID(ctx context.Context, orderID int64) (*Order, error) {
 	var o Order
 	err := r.db.QueryRow(ctx, `
 		SELECT id, user_id, status, delivery_date, pickup_point, order_date, total_amount, receipt_url, created_at, updated_at
 		FROM orders WHERE id = $1
 	`, orderID).Scan(&o.ID, &o.UserID, &o.Status, &o.DeliveryDate, &o.PickupPoint, &o.OrderDate, &o.TotalAmount, &o.ReceiptURL, &o.CreatedAt, &o.UpdatedAt)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, errors.ErrNotFound
+		if errors.Is(err, pgx.ErrNoRows) {
+			r.log.Warnw("order not found", "orderID", orderID)
+			return nil, pkgerrors.ErrNotFound
 		}
-		return nil, err
+		r.log.Errorw("get order failed", "orderID", orderID, "error", err)
+		return nil, pkgerrors.ErrInternal
 	}
 
 	rows, err := r.db.Query(ctx, `
 		SELECT product_id, quantity, price, total_price
-		FROM order_items
-		WHERE order_id = $1
+		FROM order_items WHERE order_id = $1
 	`, orderID)
 	if err != nil {
-		return nil, err
+		r.log.Errorw("get order items failed", "orderID", orderID, "error", err)
+		return nil, pkgerrors.ErrInternal
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		var item OrderItem
-		err := rows.Scan(&item.ProductID, &item.Quantity, &item.Price, &item.TotalPrice)
-		if err != nil {
-			return nil, err
+		if err := rows.Scan(&item.ProductID, &item.Quantity, &item.Price, &item.TotalPrice); err != nil {
+			r.log.Errorw("scan order item failed", "orderID", orderID, "error", err)
+			return nil, pkgerrors.ErrInternal
 		}
 		o.Items = append(o.Items, item)
 	}
@@ -123,48 +123,72 @@ func (r *Repo) GetByID(ctx context.Context, orderID int) (*Order, error) {
 	return &o, nil
 }
 
-func (r *Repo) GetAllByUser(ctx context.Context, userID int) ([]*Order, error) {
+func (r *Repo) GetAllByUser(ctx context.Context, userID int64) ([]*Order, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, user_id, status, delivery_date, pickup_point, order_date, total_amount, receipt_url, created_at, updated_at
 		FROM orders WHERE user_id = $1 ORDER BY order_date DESC
 	`, userID)
 	if err != nil {
-		return nil, err
+		r.log.Errorw("get all orders failed", "userID", userID, "error", err)
+		return nil, pkgerrors.ErrInternal
 	}
 	defer rows.Close()
 
 	var orders []*Order
 	for rows.Next() {
 		var o Order
-		err := rows.Scan(&o.ID, &o.UserID, &o.Status, &o.DeliveryDate, &o.PickupPoint, &o.OrderDate, &o.TotalAmount, &o.ReceiptURL, &o.CreatedAt, &o.UpdatedAt)
-		if err != nil {
-			return nil, err
+		if err := rows.Scan(&o.ID, &o.UserID, &o.Status, &o.DeliveryDate, &o.PickupPoint, &o.OrderDate, &o.TotalAmount, &o.ReceiptURL, &o.CreatedAt, &o.UpdatedAt); err != nil {
+			r.log.Errorw("scan order failed", "userID", userID, "error", err)
+			return nil, pkgerrors.ErrInternal
 		}
 		orders = append(orders, &o)
 	}
 	return orders, nil
 }
 
-func (r *Repo) UpdateStatus(ctx context.Context, orderID int, status string) error {
+func (r *Repo) UpdateStatus(ctx context.Context, orderID int64, status string) error {
 	cmd, err := r.db.Exec(ctx, `
 		UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2
 	`, status, orderID)
 	if err != nil {
-		return err
+		r.log.Errorw("update order status failed", "orderID", orderID, "status", status, "error", err)
+		return r.handlePgError(err, "update status")
 	}
 	if cmd.RowsAffected() == 0 {
-		return errors.ErrNotFound
+		r.log.Warnw("order not found for update", "orderID", orderID)
+		return pkgerrors.ErrNotFound
 	}
 	return nil
 }
 
-func (r *Repo) Delete(ctx context.Context, orderID int) error {
+func (r *Repo) Delete(ctx context.Context, orderID int64) error {
 	cmd, err := r.db.Exec(ctx, `DELETE FROM orders WHERE id = $1`, orderID)
 	if err != nil {
-		return err
+		r.log.Errorw("delete order failed", "orderID", orderID, "error", err)
+		return r.handlePgError(err, "delete order")
 	}
 	if cmd.RowsAffected() == 0 {
-		return errors.ErrNotFound
+		r.log.Warnw("order not found for delete", "orderID", orderID)
+		return pkgerrors.ErrNotFound
 	}
+	r.log.Infow("order deleted", "orderID", orderID)
 	return nil
+}
+
+func (r *Repo) handlePgError(err error, context string) error {
+	if pgErr, ok := err.(*pgconn.PgError); ok {
+		switch pgErr.Code {
+		case pkgerrors.PGErrForeignKeyViolation:
+			return pkgerrors.ErrInvalidInput
+		case pkgerrors.PGErrUniqueViolation:
+			return pkgerrors.ErrAlreadyExists
+		case pkgerrors.PGErrInvalidTextRep, pkgerrors.PGErrInvalidType:
+			return pkgerrors.ErrInvalidInput
+		default:
+			r.log.Errorw(context+" failed", "pg_code", pgErr.Code, "pg_msg", pgErr.Message)
+			return pkgerrors.ErrInternal
+		}
+	}
+	r.log.Errorw(context+" failed (non-pg)", "error", err)
+	return pkgerrors.ErrInternal
 }

@@ -11,12 +11,12 @@ import (
 )
 
 type Product struct {
-	ID            int
+	ID            int64
 	Name          string
 	Description   string
 	ImageUrl      string
 	Price         int64
-	StockQuantity int
+	StockQuantity int64
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -39,7 +39,7 @@ func (r *Repo) CreateProduct(ctx context.Context, product *Product) error {
 	return nil
 }
 
-func (r *Repo) DeleteProduct(ctx context.Context, productID int) error {
+func (r *Repo) DeleteProduct(ctx context.Context, productID int64) error {
 	query := `DELETE FROM products WHERE id = $1`
 	cmdTag, err := r.db.Exec(ctx, query, productID)
 	if err != nil {
@@ -51,7 +51,7 @@ func (r *Repo) DeleteProduct(ctx context.Context, productID int) error {
 	return nil
 }
 
-func (r *Repo) GetProductByID(ctx context.Context, productID int) (*Product, error) {
+func (r *Repo) GetProductByID(ctx context.Context, productID int64) (*Product, error) {
 	query := `SELECT id,name,description,image_url,price,stock_quantity,created_at,updated_at
 			  FROM products WHERE id = $1`
 	row := r.db.QueryRow(ctx, query, productID)
