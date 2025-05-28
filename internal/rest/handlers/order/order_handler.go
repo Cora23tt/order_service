@@ -53,6 +53,9 @@ func (h *Handler) Create(c *gin.Context) {
 		case errors.Is(err, pkgerrors.ErrInvalidInput):
 			h.log.Warnw("invalid data for order creation", "userID", userID, "error", err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user or product"})
+		case errors.Is(err, pkgerrors.ErrInsufficientStock):
+			h.log.Warnw("insufficient stock for order", "userID", userID, "error", err)
+			c.JSON(http.StatusConflict, gin.H{"error": "insufficient stock"})
 		default:
 			h.log.Errorw("internal error during order creation", "userID", userID, "error", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})

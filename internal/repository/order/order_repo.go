@@ -14,12 +14,22 @@ import (
 )
 
 type Repo struct {
-	db  *pgxpool.Pool
+	db  TxExecutor
 	log *zap.SugaredLogger
 }
 
 func NewRepo(db *pgxpool.Pool, log *zap.SugaredLogger) *Repo {
 	return &Repo{db: db, log: log}
+}
+
+func NewWithTx(tx pgx.Tx, log *zap.SugaredLogger) *Repo {
+	return &Repo{db: tx, log: log}
+}
+
+type TxExecutor interface {
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+	QueryRow(context.Context, string, ...any) pgx.Row
 }
 
 type Order struct {
@@ -44,19 +54,8 @@ type OrderItem struct {
 }
 
 func (r *Repo) Create(ctx context.Context, o *Order) (int64, error) {
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		r.log.Errorw("begin transaction failed", "error", err)
-		return 0, pkgerrors.ErrInternal
-	}
-	defer func() {
-		if err := tx.Rollback(ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			r.log.Errorw("rollback failed", "error", err)
-		}
-	}()
-
 	var orderID int64
-	err = tx.QueryRow(ctx, `
+	err := r.db.QueryRow(ctx, `
 		INSERT INTO orders (user_id, status, delivery_date, pickup_point, total_amount)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id
@@ -67,7 +66,7 @@ func (r *Repo) Create(ctx context.Context, o *Order) (int64, error) {
 	}
 
 	for _, item := range o.Items {
-		_, err := tx.Exec(ctx, `
+		_, err := r.db.Exec(ctx, `
 			INSERT INTO order_items (order_id, product_id, quantity, price)
 			VALUES ($1, $2, $3, $4)
 		`, orderID, item.ProductID, item.Quantity, item.Price)
@@ -75,11 +74,6 @@ func (r *Repo) Create(ctx context.Context, o *Order) (int64, error) {
 			r.log.Errorw("insert order item failed", "orderID", orderID, "productID", item.ProductID, "error", err)
 			return 0, r.handlePgError(err, "insert order item")
 		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		r.log.Errorw("commit failed", "orderID", orderID, "error", err)
-		return 0, pkgerrors.ErrInternal
 	}
 
 	r.log.Infow("order created", "orderID", orderID, "userID", o.UserID)

@@ -12,6 +12,7 @@ var (
 	ErrForbidden          = errors.New("forbidden")
 	ErrInvalidTransition  = errors.New("invalid status transition")
 	ErrOrderCompleted     = errors.New("order already completed")
+	ErrInsufficientStock  = errors.New("insufficient stock")
 
 	PGErrForeignKeyViolation = "23503"
 	PGErrUniqueViolation     = "23505"

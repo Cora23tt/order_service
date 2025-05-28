@@ -5,6 +5,8 @@ import (
 	"time"
 
 	repo "github.com/Cora23tt/order_service/internal/repository/order"
+	"github.com/Cora23tt/order_service/internal/repository/product"
+	"github.com/Cora23tt/order_service/internal/repository/uow"
 	"github.com/Cora23tt/order_service/pkg/enums"
 	"github.com/Cora23tt/order_service/pkg/errors"
 	"go.uber.org/zap"
@@ -13,10 +15,11 @@ import (
 type Service struct {
 	repo *repo.Repo
 	log  *zap.SugaredLogger
+	uow  uow.UnitOfWork
 }
 
-func NewService(r *repo.Repo, log *zap.SugaredLogger) *Service {
-	return &Service{repo: r, log: log}
+func NewService(r *repo.Repo, log *zap.SugaredLogger, uow uow.UnitOfWork) *Service {
+	return &Service{repo: r, log: log, uow: uow}
 }
 
 type CreateOrderInput struct {
@@ -33,29 +36,52 @@ type OrderItemInput struct {
 }
 
 func (s *Service) CreateOrder(ctx context.Context, input CreateOrderInput) (int64, error) {
-	var total int64
-	for _, item := range input.Items {
-		total += item.Price * item.Quantity
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		s.log.Errorw("begin transaction failed", "error", err)
+		return 0, errors.ErrInternal
 	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback(ctx)
+		}
+	}()
 
+	orderRepo := repo.NewWithTx(tx.GetTx(), s.log)
+	productRepo := product.NewWithTx(tx.GetTx(), s.log)
+
+	var total int64
 	order := &repo.Order{
 		UserID:       input.UserID,
 		Status:       enums.StatusPendingPayment,
 		DeliveryDate: input.DeliveryDate,
 		PickupPoint:  input.PickupPoint,
-		TotalAmount:  total,
+		TotalAmount:  0,
 		Items:        make([]repo.OrderItem, 0, len(input.Items)),
 	}
 
 	for _, item := range input.Items {
+		product, err := productRepo.GetProductByID(ctx, item.ProductID)
+		if err != nil {
+			s.log.Errorw("product not found", "product_id", item.ProductID, "error", err)
+			return 0, errors.ErrInvalidInput
+		}
+		if product.StockQuantity < item.Quantity {
+			s.log.Warnw("insufficient stock", "product_id", item.ProductID, "available", product.StockQuantity, "requested", item.Quantity)
+			return 0, errors.ErrInsufficientStock
+		}
+
+		total += item.Price * item.Quantity
 		order.Items = append(order.Items, repo.OrderItem{
 			ProductID: item.ProductID,
 			Quantity:  item.Quantity,
 			Price:     item.Price,
 		})
 	}
+	order.TotalAmount = total
 
-	orderID, err := s.repo.Create(ctx, order)
+	orderID, err := orderRepo.Create(ctx, order)
 	if err != nil {
 		s.log.Errorw("create order failed", "user_id", input.UserID, "error", err)
 		switch err {
@@ -65,6 +91,12 @@ func (s *Service) CreateOrder(ctx context.Context, input CreateOrderInput) (int6
 			return 0, errors.ErrInternal
 		}
 	}
+
+	if err := tx.Commit(ctx); err != nil {
+		s.log.Errorw("commit transaction failed", "order_id", orderID, "error", err)
+		return 0, errors.ErrInternal
+	}
+	committed = true
 
 	s.log.Infow("order created", "order_id", orderID, "user_id", input.UserID)
 	return orderID, nil

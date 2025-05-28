@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"go.uber.org/dig"
 
@@ -25,6 +26,8 @@ import (
 	productRepo "github.com/Cora23tt/order_service/internal/repository/product"
 	productHandler "github.com/Cora23tt/order_service/internal/rest/handlers/product"
 	productService "github.com/Cora23tt/order_service/internal/usecase/product"
+
+	uowRepo "github.com/Cora23tt/order_service/internal/repository/uow"
 
 	"github.com/Cora23tt/order_service/internal/rest"
 	"github.com/Cora23tt/order_service/internal/rest/middleware"
@@ -66,6 +69,10 @@ func execute() error {
 		productRepo.NewRepo,
 		productHandler.NewHandler,
 		productService.NewService,
+
+		func(db *pgxpool.Pool) uowRepo.UnitOfWork {
+			return uowRepo.New(db)
+		},
 
 		rest.NewRESTServer,
 		rest.NewHTTPServer,
