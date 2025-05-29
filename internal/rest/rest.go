@@ -83,6 +83,9 @@ func (s *Server) SetupRoutes() {
 	{
 		adminOrdersGroup.DELETE("/:id", s.order.Delete)
 		adminOrdersGroup.PUT("/:id", s.order.Update)
+		adminOrdersGroup.GET("/stats", s.order.GetStats)
+		adminOrdersGroup.GET("/export", s.order.Export)
+		adminOrdersGroup.GET("/export/csv", s.order.ExportCSV)
 	}
 
 	publicProductGroup := s.mux.Group(baseUrl + "/products")

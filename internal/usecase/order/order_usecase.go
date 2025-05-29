@@ -191,3 +191,62 @@ func (s *Service) DeleteOrder(ctx context.Context, orderID int64) error {
 	s.log.Infow("order deleted", "order_id", orderID)
 	return nil
 }
+
+func (s *Service) GetStats(ctx context.Context, from, to *time.Time) ([]repo.OrderStats, error) {
+	orderRepo := s.repo
+
+	now := time.Now()
+
+	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()) // start of month
+	end := time.Now()
+	if from != nil {
+		start = *from
+	}
+	if to != nil {
+		end = *to
+	}
+
+	if !start.Before(end) && !start.Equal(end) {
+		s.log.Warnw("invalid date range", "from", start, "to", end)
+		return nil, errors.ErrInvalidInput
+	}
+
+	stats, err := orderRepo.GetStats(ctx, start, end)
+	if err != nil {
+		return nil, err
+	}
+	return stats, nil
+}
+
+type ExportFilter struct {
+	UserID    *int64
+	Status    *enums.OrderStatus
+	MinAmount *int64
+	MaxAmount *int64
+	Limit     int
+	Offset    int
+}
+
+func (s *Service) ExportOrders(ctx context.Context, f ExportFilter) ([]*repo.Order, error) {
+
+	if f.Limit == 0 {
+		f.Limit = 20
+	}
+	if f.Offset < 0 {
+		f.Offset = 0
+	}
+
+	orders, err := s.repo.Export(ctx, repo.ExportFilter{
+		UserID:    f.UserID,
+		Status:    f.Status,
+		MinAmount: f.MinAmount,
+		MaxAmount: f.MaxAmount,
+		Limit:     f.Limit,
+		Offset:    f.Offset,
+	})
+	if err != nil {
+		s.log.Errorw("export orders failed", "filter", f, "error", err)
+		return nil, errors.ErrInternal
+	}
+	return orders, nil
+}

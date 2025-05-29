@@ -3,6 +3,7 @@ package order
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/Cora23tt/order_service/pkg/enums"
@@ -185,4 +186,99 @@ func (r *Repo) handlePgError(err error, context string) error {
 	}
 	r.log.Errorw(context+" failed (non-pg)", "error", err)
 	return pkgerrors.ErrInternal
+}
+
+type OrderStats struct {
+	Status enums.OrderStatus `json:"status"`
+	Count  int64             `json:"count"`
+}
+
+func (r *Repo) GetStats(ctx context.Context, from, to time.Time) ([]OrderStats, error) {
+	query := `
+		SELECT status, COUNT(*) 
+		FROM orders 
+		WHERE order_date BETWEEN $1 AND $2
+		GROUP BY status
+	`
+	rows, err := r.db.Query(ctx, query, from, to)
+	if err != nil {
+		r.log.Errorw("get order stats failed", "error", err)
+		return nil, pkgerrors.ErrInternal
+	}
+	defer rows.Close()
+
+	var stats []OrderStats
+	for rows.Next() {
+		var s OrderStats
+		if err := rows.Scan(&s.Status, &s.Count); err != nil {
+			r.log.Errorw("scan order stats failed", "error", err)
+			return nil, pkgerrors.ErrInternal
+		}
+		stats = append(stats, s)
+	}
+	return stats, nil
+}
+
+type ExportFilter struct {
+	UserID    *int64
+	Status    *enums.OrderStatus
+	MinAmount *int64
+	MaxAmount *int64
+	Limit     int
+	Offset    int
+}
+
+func (r *Repo) Export(ctx context.Context, f ExportFilter) ([]*Order, error) {
+	var (
+		query  = `SELECT id, user_id, status, delivery_date, pickup_point, order_date, total_amount, receipt_url, created_at, updated_at FROM orders WHERE 1=1`
+		params []interface{}
+		index  = 1
+	)
+
+	if f.UserID != nil {
+		query += ` AND user_id = $` + strconv.Itoa(index)
+		params = append(params, *f.UserID)
+		index++
+	}
+	if f.Status != nil {
+		query += ` AND status = $` + strconv.Itoa(index)
+		params = append(params, *f.Status)
+		index++
+	}
+	if f.MinAmount != nil {
+		query += ` AND total_amount >= $` + strconv.Itoa(index)
+		params = append(params, *f.MinAmount)
+		index++
+	}
+	if f.MaxAmount != nil {
+		query += ` AND total_amount <= $` + strconv.Itoa(index)
+		params = append(params, *f.MaxAmount)
+		index++
+	}
+
+	query += ` ORDER BY order_date DESC LIMIT $` + strconv.Itoa(index)
+	params = append(params, f.Limit)
+	index++
+
+	query += ` OFFSET $` + strconv.Itoa(index)
+	params = append(params, f.Offset)
+
+	rows, err := r.db.Query(ctx, query, params...)
+	if err != nil {
+		r.log.Errorw("export orders failed", "error", err)
+		return nil, pkgerrors.ErrInternal
+	}
+	defer rows.Close()
+
+	var orders []*Order
+	for rows.Next() {
+		var o Order
+		if err := rows.Scan(&o.ID, &o.UserID, &o.Status, &o.DeliveryDate, &o.PickupPoint, &o.OrderDate, &o.TotalAmount, &o.ReceiptURL, &o.CreatedAt, &o.UpdatedAt); err != nil {
+			r.log.Errorw("scan order failed", "error", err)
+			return nil, pkgerrors.ErrInternal
+		}
+		orders = append(orders, &o)
+	}
+
+	return orders, nil
 }

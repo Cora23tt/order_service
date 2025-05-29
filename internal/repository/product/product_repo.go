@@ -26,7 +26,6 @@ type Product struct {
 
 type Repo struct {
 	db  TxExecutor
-	tx  pgx.Tx
 	log *zap.SugaredLogger
 }
 
@@ -35,7 +34,7 @@ func NewRepo(db *pgxpool.Pool, log *zap.SugaredLogger) *Repo {
 }
 
 func NewWithTx(tx pgx.Tx, log *zap.SugaredLogger) *Repo {
-	return &Repo{tx: tx, log: log}
+	return &Repo{db: tx, log: log}
 }
 
 type TxExecutor interface {
@@ -48,7 +47,7 @@ func (r *Repo) CreateProduct(ctx context.Context, product *Product) error {
 	query := `
 		INSERT INTO products (name, description, image_url, price, stock_quantity)
 		VALUES ($1, $2, $3, $4, $5)`
-	_, err := r.tx.Exec(ctx, query,
+	_, err := r.db.Exec(ctx, query,
 		product.Name,
 		product.Description,
 		product.ImageUrl,
@@ -60,7 +59,7 @@ func (r *Repo) CreateProduct(ctx context.Context, product *Product) error {
 }
 
 func (r *Repo) DeleteProduct(ctx context.Context, productID int64) error {
-	cmd, err := r.tx.Exec(ctx, `DELETE FROM products WHERE id = $1`, productID)
+	cmd, err := r.db.Exec(ctx, `DELETE FROM products WHERE id = $1`, productID)
 	if err != nil {
 		r.log.Errorw("failed to delete product", "id", productID, "error", err)
 		return r.handlePgError("delete product", err)
@@ -77,7 +76,7 @@ func (r *Repo) GetProductByID(ctx context.Context, productID int64) (*Product, e
 	query := `
 		SELECT id, name, description, image_url, price, stock_quantity, created_at, updated_at
 		FROM products WHERE id = $1`
-	row := r.tx.QueryRow(ctx, query, productID)
+	row := r.db.QueryRow(ctx, query, productID)
 
 	var product Product
 	err := row.Scan(
@@ -105,7 +104,7 @@ func (r *Repo) GetProducts(ctx context.Context) ([]*Product, error) {
 	query := `
 		SELECT id, name, description, image_url, price, stock_quantity, created_at, updated_at
 		FROM products ORDER BY created_at DESC LIMIT 100`
-	rows, err := r.tx.Query(ctx, query)
+	rows, err := r.db.Query(ctx, query)
 	if err != nil {
 		r.log.Errorw("failed to get products", "error", err)
 		return nil, r.handlePgError("get products", err)
@@ -133,7 +132,7 @@ func (r *Repo) GetProducts(ctx context.Context) ([]*Product, error) {
 }
 
 func (r *Repo) UpdateProduct(ctx context.Context, product *Product) error {
-	cmd, err := r.tx.Exec(ctx, `
+	cmd, err := r.db.Exec(ctx, `
 		UPDATE products
 		SET name = $1, description = $2, image_url = $3, price = $4, stock_quantity = $5, updated_at = NOW()
 		WHERE id = $6`,
