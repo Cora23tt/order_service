@@ -1,4 +1,143 @@
 basePath: /
+definitions:
+  auth.Credentials:
+    properties:
+      password:
+        example: strong_password_123
+        type: string
+      phone_number:
+        example: "+998901234567"
+        type: string
+    type: object
+  enums.OrderStatus:
+    enum:
+    - pending_payment
+    - paid
+    - processing
+    - shipped
+    - delivered
+    - cancelled
+    type: string
+    x-enum-varnames:
+    - StatusPendingPayment
+    - StatusPaid
+    - StatusProcessing
+    - StatusShipped
+    - StatusDelivered
+    - StatusCancelled
+  internal_rest_handlers_product.Product:
+    properties:
+      description:
+        type: string
+      image_url:
+        type: string
+      name:
+        type: string
+      price:
+        minimum: 0
+        type: integer
+      quantity:
+        minimum: 0
+        type: integer
+    required:
+    - name
+    - price
+    - quantity
+    type: object
+  order.CreateOrderRequest:
+    properties:
+      delivery_date:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/order.OrderItemInput'
+        type: array
+      pickup_point:
+        example: Mirzo Ulug'bek. Buyuk Ipak Yoli st. 109/45
+        type: string
+    required:
+    - items
+    - pickup_point
+    type: object
+  order.Order:
+    properties:
+      created_at:
+        type: string
+      delivery_date:
+        type: string
+      id:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/order.OrderItem'
+        type: array
+      order_date:
+        type: string
+      pickup_point:
+        type: string
+      receipt_url:
+        type: string
+      status:
+        $ref: '#/definitions/enums.OrderStatus'
+      total_amount:
+        type: integer
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  order.OrderItem:
+    properties:
+      price:
+        type: integer
+      product_id:
+        type: integer
+      quantity:
+        type: integer
+      total_price:
+        type: integer
+    type: object
+  order.OrderItemInput:
+    properties:
+      price:
+        example: 12000
+        type: integer
+      product_id:
+        type: integer
+      quantity:
+        example: 4
+        type: integer
+    required:
+    - price
+    - product_id
+    - quantity
+    type: object
+  order.UpdateStatusRequest:
+    properties:
+      status:
+        example: processing
+        type: string
+    required:
+    - status
+    type: object
+  user.Profile:
+    properties:
+      avatar_url:
+        example: /profile/1/photo
+        type: string
+      id:
+        example: 1
+        type: integer
+      phone_number:
+        example: "+998901234567"
+        type: string
+      pinfl:
+        example: "12345678901234"
+        type: string
+      role:
+        example: user
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact:
@@ -10,5 +149,757 @@ info:
   termsOfService: http://example.com/terms/
   title: Order Service API
   version: "1.0"
-paths: {}
+paths:
+  /api/v1/admin/users:
+    get:
+      description: Админский доступ. Возвращает список всех зарегистрированных пользователей
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/user.Profile'
+            type: array
+        "403":
+          description: forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: internal error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получение списка всех пользователей
+      tags:
+      - Admin - Users
+  /api/v1/auth/signin:
+    post:
+      consumes:
+      - application/json
+      description: Аутентифицирует пользователя и выдает JWT токен
+      parameters:
+      - description: Телефон и пароль
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/auth.Credentials'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: JWT токен
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid request body
+          schema:
+            type: string
+        "500":
+          description: Error initialising session token
+          schema:
+            type: string
+      summary: Вход пользователя
+      tags:
+      - Auth
+  /api/v1/auth/signup:
+    post:
+      consumes:
+      - application/json
+      description: Регистрирует нового пользователя по номеру телефона и паролю
+      parameters:
+      - description: Данные пользователя
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/auth.Credentials'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ID нового пользователя
+          schema:
+            additionalProperties:
+              type: integer
+            type: object
+        "400":
+          description: Invalid request body
+          schema:
+            type: string
+        "409":
+          description: A user with this phone number already exists
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Регистрация нового пользователя
+      tags:
+      - Auth
+  /api/v1/me:
+    get:
+      description: Возвращает информацию о текущем пользователе по JWT-токену
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Профиль пользователя
+          schema:
+            $ref: '#/definitions/user.Profile'
+        "401":
+          description: unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: user not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: internal error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получение профиля текущего пользователя
+      tags:
+      - User
+    patch:
+      consumes:
+      - multipart/form-data
+      description: Обновляет PINFL и аватар текущего пользователя
+      parameters:
+      - description: ПИНФЛ пользователя
+        in: formData
+        name: pinfl
+        type: string
+      - description: Аватар (изображение)
+        in: formData
+        name: avatar
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: profile updated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: user not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: internal error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Обновление профиля пользователя
+      tags:
+      - User
+  /api/v1/orders:
+    get:
+      description: Возвращает список заказов текущего пользователя
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/order.Order'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get all user orders
+      tags:
+      - orders
+  /api/v1/orders/:
+    post:
+      consumes:
+      - application/json
+      description: Create a new order for authenticated user
+      parameters:
+      - description: Order info
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/order.CreateOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: order_id
+          schema:
+            additionalProperties:
+              type: integer
+            type: object
+        "400":
+          description: invalid input
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: insufficient stock
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: internal error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create order
+      tags:
+      - Orders
+  /api/v1/orders/{id}:
+    delete:
+      description: Удаляет заказ по ID
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete order by ID (admin)
+      tags:
+      - orders
+    get:
+      description: Возвращает заказ по ID (user/admin)
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/order.Order'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get order by ID
+      tags:
+      - orders
+    put:
+      description: Обновляет статус заказа по ID
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: New status
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/order.UpdateStatusRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update order status (admin)
+      tags:
+      - orders
+  /api/v1/orders/{id}/cancel:
+    get:
+      description: Отмена заказа пользователем
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Cancel order
+      tags:
+      - orders
+  /api/v1/orders/export:
+    get:
+      description: Экспорт заказов в JSON по фильтрам
+      parameters:
+      - description: Filter by user ID
+        in: query
+        name: user_id
+        type: integer
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      - description: Filter by min amount
+        in: query
+        name: min_amount
+        type: integer
+      - description: Filter by max amount
+        in: query
+        name: max_amount
+        type: integer
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Export orders (admin)
+      tags:
+      - orders
+  /api/v1/orders/export/csv:
+    get:
+      description: Экспорт заказов в CSV по фильтрам
+      parameters:
+      - description: Filter by user ID
+        in: query
+        name: user_id
+        type: integer
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      - description: Filter by min amount
+        in: query
+        name: min_amount
+        type: integer
+      - description: Filter by max amount
+        in: query
+        name: max_amount
+        type: integer
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      responses:
+        "200":
+          description: CSV file
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Export orders as CSV (admin)
+      tags:
+      - orders
+  /api/v1/orders/stats:
+    get:
+      description: Получает статистику заказов по статусам за период
+      parameters:
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get order stats (admin)
+      tags:
+      - orders
+  /api/v1/products:
+    get:
+      description: Возвращает список всех доступных продуктов
+      responses:
+        "200":
+          description: 'products: []Product'
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get all products
+      tags:
+      - products
+    post:
+      description: Добавляет новый продукт в каталог
+      parameters:
+      - description: Product object
+        in: body
+        name: product
+        required: true
+        schema:
+          $ref: '#/definitions/internal_rest_handlers_product.Product'
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Add new product (admin)
+      tags:
+      - products
+  /api/v1/products/{id}:
+    delete:
+      description: Удаляет продукт по ID
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete product by ID (admin)
+      tags:
+      - products
+    get:
+      description: Возвращает продукт по его ID
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: 'product: Product'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get product by ID
+      tags:
+      - products
+    put:
+      description: Обновляет информацию о продукте по ID
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated product
+        in: body
+        name: product
+        required: true
+        schema:
+          $ref: '#/definitions/internal_rest_handlers_product.Product'
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update product by ID (admin)
+      tags:
+      - products
+  /profile/{id}/photo:
+    get:
+      description: Возвращает файл изображения профиля по ID пользователя
+      parameters:
+      - description: ID пользователя
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - image/jpeg
+      - image/png
+      - image/webp
+      responses:
+        "200":
+          description: Изображение аватара
+          schema:
+            type: file
+        "404":
+          description: photo not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получение аватара пользователя
+      tags:
+      - User
 swagger: "2.0"

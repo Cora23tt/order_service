@@ -31,8 +31,8 @@ type CreateOrderInput struct {
 
 type OrderItemInput struct {
 	ProductID int64 `json:"product_id" binding:"required"`
-	Quantity  int64 `json:"quantity" binding:"required"`
-	Price     int64 `json:"price" binding:"required"`
+	Quantity  int64 `json:"quantity" binding:"required" example:"4"`
+	Price     int64 `json:"price" binding:"required" example:"12000"`
 }
 
 func (s *Service) CreateOrder(ctx context.Context, input CreateOrderInput) (int64, error) {

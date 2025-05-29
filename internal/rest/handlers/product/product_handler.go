@@ -29,6 +29,64 @@ type Product struct {
 	Quantity    int64  `json:"quantity" binding:"required,gte=0"`
 }
 
+// @Summary Get all products
+// @Description Возвращает список всех доступных продуктов
+// @Tags products
+// @Success 200 {object} map[string]interface{} "products: []Product"
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/products [get]
+func (h *Handler) GetProducts(c *gin.Context) {
+	products, err := h.service.GetProducts(c.Request.Context())
+	if err != nil {
+		h.log.Errorw("failed to get products", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+	h.log.Infow("product list retrieved", "count", len(products))
+	c.JSON(http.StatusOK, gin.H{"products": products})
+}
+
+// @Summary Get product by ID
+// @Description Возвращает продукт по его ID
+// @Tags products
+// @Param id path int true "Product ID"
+// @Success 200 {object} map[string]interface{} "product: Product"
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/products/{id} [get]
+func (h *Handler) GetProduct(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		h.log.Warnw("invalid product id for get", "raw", c.Param("id"))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	product, err := h.service.GetProductByID(c.Request.Context(), id)
+	switch {
+	case errors.Is(err, pkgerrors.ErrNotFound):
+		h.log.Warnw("product not found", "id", id)
+		c.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
+	case err != nil:
+		h.log.Errorw("get product error", "id", id, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+	default:
+		h.log.Infow("product retrieved", "id", id)
+		c.JSON(http.StatusOK, gin.H{"product": product})
+	}
+}
+
+// @Summary Add new product (admin)
+// @Description Добавляет новый продукт в каталог
+// @Tags products
+// @Security BearerAuth
+// @Param product body product.Product true "Product object"
+// @Success 201 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 409 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/products [post]
 func (h *Handler) AddProduct(c *gin.Context) {
 	var p Product
 	if err := c.ShouldBindJSON(&p); err != nil {
@@ -54,6 +112,18 @@ func (h *Handler) AddProduct(c *gin.Context) {
 	}
 }
 
+// @Summary Update product by ID (admin)
+// @Description Обновляет информацию о продукте по ID
+// @Tags products
+// @Security BearerAuth
+// @Param id path int true "Product ID"
+// @Param product body product.Product true "Updated product"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 409 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/products/{id} [put]
 func (h *Handler) UpdateProduct(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -89,6 +159,16 @@ func (h *Handler) UpdateProduct(c *gin.Context) {
 	}
 }
 
+// @Summary Delete product by ID (admin)
+// @Description Удаляет продукт по ID
+// @Tags products
+// @Security BearerAuth
+// @Param id path int true "Product ID"
+// @Success 204 "No Content"
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/products/{id} [delete]
 func (h *Handler) DeleteProduct(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -109,37 +189,4 @@ func (h *Handler) DeleteProduct(c *gin.Context) {
 		h.log.Infow("product deleted", "id", id)
 		c.Status(http.StatusNoContent)
 	}
-}
-
-func (h *Handler) GetProduct(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		h.log.Warnw("invalid product id for get", "raw", c.Param("id"))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
-
-	product, err := h.service.GetProductByID(c.Request.Context(), id)
-	switch {
-	case errors.Is(err, pkgerrors.ErrNotFound):
-		h.log.Warnw("product not found", "id", id)
-		c.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
-	case err != nil:
-		h.log.Errorw("get product error", "id", id, "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
-	default:
-		h.log.Infow("product retrieved", "id", id)
-		c.JSON(http.StatusOK, gin.H{"product": product})
-	}
-}
-
-func (h *Handler) GetProducts(c *gin.Context) {
-	products, err := h.service.GetProducts(c.Request.Context())
-	if err != nil {
-		h.log.Errorw("failed to get products", "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
-		return
-	}
-	h.log.Infow("product list retrieved", "count", len(products))
-	c.JSON(http.StatusOK, gin.H{"products": products})
 }

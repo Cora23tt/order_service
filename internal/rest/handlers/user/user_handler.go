@@ -22,6 +22,17 @@ func NewHandler(service *user.Service, log *zap.SugaredLogger) *Handler {
 	return &Handler{service: service, log: log}
 }
 
+// GetProfile godoc
+// @Summary Получение профиля текущего пользователя
+// @Description Возвращает информацию о текущем пользователе по JWT-токену
+// @Tags User
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {object} user.Profile "Профиль пользователя"
+// @Failure 401 {object} map[string]string "unauthorized"
+// @Failure 404 {object} map[string]string "user not found"
+// @Failure 500 {object} map[string]string "internal error"
+// @Router /api/v1/me [get]
 func (h *Handler) GetProfile(c *gin.Context) {
 	userIDRaw, exists := c.Get("userID")
 	if !exists {
@@ -44,25 +55,25 @@ func (h *Handler) GetProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, profile)
 }
 
-func (h *Handler) GetProfilePhoto(c *gin.Context) {
-	id := c.Param("id")
-	exts := []string{".jpg", ".jpeg", ".png", ".webp"}
-	for _, ext := range exts {
-		path := fmt.Sprintf("web/avatars/%s/profile%s", id, ext)
-		if _, err := os.Stat(path); err == nil {
-			c.File(path)
-			return
-		}
-	}
-
-	c.JSON(http.StatusNotFound, gin.H{"error": "photo not found"})
-}
-
 type UpdateProfileRequest struct {
 	PINFL     *string `json:"pinfl,omitempty"`
 	AvatarURL *string `json:"avatar_url,omitempty"`
 }
 
+// UpdateProfile godoc
+// @Summary Обновление профиля пользователя
+// @Description Обновляет PINFL и аватар текущего пользователя
+// @Tags User
+// @Security BearerAuth
+// @Accept multipart/form-data
+// @Produce json
+// @Param pinfl formData string false "ПИНФЛ пользователя"
+// @Param avatar formData file false "Аватар (изображение)"
+// @Success 200 {object} map[string]string "profile updated"
+// @Failure 401 {object} map[string]string "unauthorized"
+// @Failure 404 {object} map[string]string "user not found"
+// @Failure 500 {object} map[string]string "internal error"
+// @Router /api/v1/me [patch]
 func (h *Handler) UpdateProfile(c *gin.Context) {
 	userIDRaw, exists := c.Get("userID")
 	if !exists {
@@ -118,6 +129,16 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "profile updated"})
 }
 
+// ListUsers godoc
+// @Summary Получение списка всех пользователей
+// @Description Админский доступ. Возвращает список всех зарегистрированных пользователей
+// @Tags Admin - Users
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {array} user.Profile
+// @Failure 403 {object} map[string]string "forbidden"
+// @Failure 500 {object} map[string]string "internal error"
+// @Router /api/v1/admin/users [get]
 func (h *Handler) ListUsers(c *gin.Context) {
 	role, exists := c.Get("role")
 	if !exists || role != "admin" {
@@ -133,4 +154,29 @@ func (h *Handler) ListUsers(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, users)
+}
+
+// GetProfilePhoto godoc
+// @Summary Получение аватара пользователя
+// @Description Возвращает файл изображения профиля по ID пользователя
+// @Tags User
+// @Produce image/jpeg
+// @Produce image/png
+// @Produce image/webp
+// @Param id path int true "ID пользователя"
+// @Success 200 {file} file "Изображение аватара"
+// @Failure 404 {object} map[string]string "photo not found"
+// @Router /profile/{id}/photo [get]
+func (h *Handler) GetProfilePhoto(c *gin.Context) {
+	id := c.Param("id")
+	exts := []string{".jpg", ".jpeg", ".png", ".webp"}
+	for _, ext := range exts {
+		path := fmt.Sprintf("web/avatars/%s/profile%s", id, ext)
+		if _, err := os.Stat(path); err == nil {
+			c.File(path)
+			return
+		}
+	}
+
+	c.JSON(http.StatusNotFound, gin.H{"error": "photo not found"})
 }

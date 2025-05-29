@@ -20,10 +20,22 @@ func NewHandler(service *auth.Service, log *zap.SugaredLogger) *Handler {
 }
 
 type Credentials struct {
-	PhoneNumber string `json:"phone_number"`
-	Password    string `json:"password"`
+	PhoneNumber string `json:"phone_number" example:"+998901234567"`
+	Password    string `json:"password" example:"strong_password_123"`
 }
 
+// SignUp godoc
+// @Summary Регистрация нового пользователя
+// @Description Регистрирует нового пользователя по номеру телефона и паролю
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param credentials body Credentials true "Данные пользователя"
+// @Success 200 {object} map[string]int64 "ID нового пользователя"
+// @Failure 400 {string} string "Invalid request body"
+// @Failure 409 {string} string "A user with this phone number already exists"
+// @Failure 500 {string} string "Internal server error"
+// @Router /api/v1/auth/signup [post]
 func (h *Handler) SignUp(c *gin.Context) {
 	var creds Credentials
 	if err := c.ShouldBindJSON(&creds); err != nil {
@@ -45,6 +57,17 @@ func (h *Handler) SignUp(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"id": userID})
 }
 
+// SignIn godoc
+// @Summary Вход пользователя
+// @Description Аутентифицирует пользователя и выдает JWT токен
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param credentials body Credentials true "Телефон и пароль"
+// @Success 200 {object} map[string]string "JWT токен"
+// @Failure 400 {string} string "Invalid request body"
+// @Failure 500 {string} string "Error initialising session token"
+// @Router /api/v1/auth/signin [post]
 func (h *Handler) SignIn(c *gin.Context) {
 	var creds Credentials
 	if err := c.ShouldBindJSON(&creds); err != nil {

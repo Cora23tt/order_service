@@ -17,11 +17,11 @@ func NewService(r *user.Repo) *Service {
 }
 
 type Profile struct {
-	ID          int64   `json:"id"`
-	PhoneNumber string  `json:"phone_number"`
-	Role        string  `json:"role"`
-	PINFL       *string `json:"pinfl,omitempty"`
-	AvatarURL   *string `json:"avatar_url,omitempty"`
+	ID          int64   `json:"id" example:"1"`
+	PhoneNumber string  `json:"phone_number" example:"+998901234567"`
+	Role        string  `json:"role" example:"user"`
+	PINFL       *string `json:"pinfl,omitempty" example:"12345678901234"`
+	AvatarURL   *string `json:"avatar_url,omitempty" example:"/profile/1/photo"`
 }
 
 func (s *Service) GetProfile(ctx context.Context, userID int64) (*Profile, error) {

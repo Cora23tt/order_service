@@ -25,10 +25,24 @@ func NewHandler(service *order.Service, log *zap.SugaredLogger) *Handler {
 
 type CreateOrderRequest struct {
 	Items        []order.OrderItemInput `json:"items" binding:"required"`
-	PickupPoint  string                 `json:"pickup_point" binding:"required"`
+	PickupPoint  string                 `json:"pickup_point" binding:"required" example:"Mirzo Ulug'bek. Buyuk Ipak Yoli st. 109/45"`
 	DeliveryDate *time.Time             `json:"delivery_date,omitempty"`
 }
 
+// Create godoc
+// @Summary Create order
+// @Description Create a new order for authenticated user
+// @Tags Orders
+// @Accept json
+// @Produce json
+// @Param request body CreateOrderRequest true "Order info"
+// @Success 201 {object} map[string]int64 "order_id"
+// @Failure 400 {object} map[string]string "invalid input"
+// @Failure 401 {object} map[string]string "unauthorized"
+// @Failure 409 {object} map[string]string "insufficient stock"
+// @Failure 500 {object} map[string]string "internal error"
+// @Router /api/v1/orders/ [post]
+// @Security BearerAuth
 func (h *Handler) Create(c *gin.Context) {
 	userIDRaw, exists := c.Get("userID")
 	if !exists {
@@ -68,6 +82,16 @@ func (h *Handler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"order_id": id})
 }
 
+// @Summary Get order by ID
+// @Description Возвращает заказ по ID (user/admin)
+// @Tags orders
+// @Security BearerAuth
+// @Param id path int true "Order ID"
+// @Success 200 {object} order.Order
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/orders/{id} [get]
 func (h *Handler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -88,6 +112,14 @@ func (h *Handler) GetByID(c *gin.Context) {
 	}
 }
 
+// @Summary Get all user orders
+// @Description Возвращает список заказов текущего пользователя
+// @Tags orders
+// @Security BearerAuth
+// @Success 200 {array} order.Order
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/orders [get]
 func (h *Handler) GetAll(c *gin.Context) {
 	userIDRaw, exists := c.Get("userID")
 	if !exists {
@@ -107,9 +139,20 @@ func (h *Handler) GetAll(c *gin.Context) {
 }
 
 type UpdateStatusRequest struct {
-	Status string `json:"status" binding:"required"`
+	Status string `json:"status" binding:"required" example:"processing"`
 }
 
+// @Summary Update order status (admin)
+// @Description Обновляет статус заказа по ID
+// @Tags orders
+// @Security BearerAuth
+// @Param id path int true "Order ID"
+// @Param input body order.UpdateStatusRequest true "New status"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/orders/{id} [put]
 func (h *Handler) Update(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -146,6 +189,16 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 }
 
+// @Summary Delete order by ID (admin)
+// @Description Удаляет заказ по ID
+// @Tags orders
+// @Security BearerAuth
+// @Param id path int true "Order ID"
+// @Success 204
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/orders/{id} [delete]
 func (h *Handler) Delete(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -166,6 +219,17 @@ func (h *Handler) Delete(c *gin.Context) {
 	}
 }
 
+// @Summary Cancel order
+// @Description Отмена заказа пользователем
+// @Tags orders
+// @Security BearerAuth
+// @Param id path int true "Order ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/orders/{id}/cancel [get]
 func (h *Handler) Cancel(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -197,6 +261,16 @@ func (h *Handler) Cancel(c *gin.Context) {
 	}
 }
 
+// @Summary Get order stats (admin)
+// @Description Получает статистику заказов по статусам за период
+// @Tags orders
+// @Security BearerAuth
+// @Param from query string false "Start date (YYYY-MM-DD)"
+// @Param to query string false "End date (YYYY-MM-DD)"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/orders/stats [get]
 func (h *Handler) GetStats(c *gin.Context) {
 	fromStr := c.Query("from")
 	toStr := c.Query("to")
@@ -240,6 +314,20 @@ func (h *Handler) GetStats(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "OK", "data": stats})
 }
 
+// @Summary Export orders (admin)
+// @Description Экспорт заказов в JSON по фильтрам
+// @Tags orders
+// @Security BearerAuth
+// @Param user_id query int false "Filter by user ID"
+// @Param status query string false "Filter by status"
+// @Param min_amount query int false "Filter by min amount"
+// @Param max_amount query int false "Filter by max amount"
+// @Param limit query int false "Limit"
+// @Param offset query int false "Offset"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/orders/export [get]
 func (h *Handler) Export(c *gin.Context) {
 	filter, ok := h.parseExportFilter(c)
 	if !ok {
@@ -256,6 +344,20 @@ func (h *Handler) Export(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"orders": orders})
 }
 
+// @Summary Export orders as CSV (admin)
+// @Description Экспорт заказов в CSV по фильтрам
+// @Tags orders
+// @Security BearerAuth
+// @Param user_id query int false "Filter by user ID"
+// @Param status query string false "Filter by status"
+// @Param min_amount query int false "Filter by min amount"
+// @Param max_amount query int false "Filter by max amount"
+// @Param limit query int false "Limit"
+// @Param offset query int false "Offset"
+// @Success 200 {string} string "CSV file"
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/orders/export/csv [get]
 func (h *Handler) ExportCSV(c *gin.Context) {
 	filter, ok := h.parseExportFilter(c)
 	if !ok {
