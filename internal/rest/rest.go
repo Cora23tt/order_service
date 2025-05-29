@@ -56,6 +56,7 @@ func (s *Server) SetupRoutes() {
 
 	s.mux.Use(gin.Recovery())
 	s.mux.Use(s.middleware.ZapLogger())
+	s.mux.Use(s.middleware.CORSMiddleware())
 
 	s.mux.GET("/profile/:id/photo", s.user.GetProfilePhoto)
 	s.mux.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

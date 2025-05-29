@@ -46,6 +46,10 @@ import (
 // @license.name  MIT
 // @host      localhost:8080
 // @BasePath  /
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
 	err := godotenv.Load()
 	if err != nil {

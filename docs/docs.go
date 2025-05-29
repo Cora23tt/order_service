@@ -34,9 +34,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Admin - Users"
+                    "User"
                 ],
-                "summary": "Получение списка всех пользователей",
+                "summary": "Получение списка всех пользователей (admin)",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -301,11 +301,11 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Возвращает список заказов текущего пользователя",
+                "description": "Возвращает список заказов",
                 "tags": [
                     "orders"
                 ],
-                "summary": "Get all user orders",
+                "summary": "Get all user orders (user/admin)",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -344,7 +344,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Create a new order for authenticated user",
+                "description": "Create a new order (user/admin)",
                 "consumes": [
                     "application/json"
                 ],
@@ -352,7 +352,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Orders"
+                    "orders"
                 ],
                 "summary": "Create order",
                 "parameters": [
@@ -634,11 +634,11 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Возвращает заказ по ID (user/admin)",
+                "description": "Возвращает заказ по ID",
                 "tags": [
                     "orders"
                 ],
-                "summary": "Get order by ID",
+                "summary": "Get order by ID (user/admin)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -817,7 +817,7 @@ const docTemplate = `{
                 "tags": [
                     "orders"
                 ],
-                "summary": "Cancel order",
+                "summary": "Cancel order (user/admin)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -882,7 +882,7 @@ const docTemplate = `{
                 "tags": [
                     "products"
                 ],
-                "summary": "Get all products",
+                "summary": "Get all products (admin/user)",
                 "responses": {
                     "200": {
                         "description": "products: []Product",
@@ -1256,9 +1256,6 @@ const docTemplate = `{
                 "pickup_point"
             ],
             "properties": {
-                "delivery_date": {
-                    "type": "string"
-                },
                 "items": {
                     "type": "array",
                     "items": {
@@ -1267,7 +1264,7 @@ const docTemplate = `{
                 },
                 "pickup_point": {
                     "type": "string",
-                    "example": "Mirzo Ulug'bek. Buyuk Ipak Yoli st. 109/45"
+                    "example": "Mirzo Ulug'bek. Buyuk Ipak Yoli st. 109. 45"
                 }
             }
         },
@@ -1342,7 +1339,8 @@ const docTemplate = `{
                     "example": 12000
                 },
                 "product_id": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 4
                 },
                 "quantity": {
                     "type": "integer",
@@ -1386,6 +1384,13 @@ const docTemplate = `{
                     "example": "user"
                 }
             }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }`

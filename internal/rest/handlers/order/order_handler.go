@@ -25,14 +25,14 @@ func NewHandler(service *order.Service, log *zap.SugaredLogger) *Handler {
 
 type CreateOrderRequest struct {
 	Items        []order.OrderItemInput `json:"items" binding:"required"`
-	PickupPoint  string                 `json:"pickup_point" binding:"required" example:"Mirzo Ulug'bek. Buyuk Ipak Yoli st. 109/45"`
-	DeliveryDate *time.Time             `json:"delivery_date,omitempty"`
+	PickupPoint  string                 `json:"pickup_point" binding:"required" example:"Mirzo Ulug'bek. Buyuk Ipak Yoli st. 109. 45"`
+	DeliveryDate *time.Time             `json:"-"`
 }
 
 // Create godoc
 // @Summary Create order
-// @Description Create a new order for authenticated user
-// @Tags Orders
+// @Description Create a new order (user/admin)
+// @Tags orders
 // @Accept json
 // @Produce json
 // @Param request body CreateOrderRequest true "Order info"
@@ -82,8 +82,8 @@ func (h *Handler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"order_id": id})
 }
 
-// @Summary Get order by ID
-// @Description Возвращает заказ по ID (user/admin)
+// @Summary Get order by ID (user/admin)
+// @Description Возвращает заказ по ID
 // @Tags orders
 // @Security BearerAuth
 // @Param id path int true "Order ID"
@@ -100,7 +100,16 @@ func (h *Handler) GetByID(c *gin.Context) {
 		return
 	}
 
-	order, err := h.service.GetOrderByID(c.Request.Context(), id)
+	userIDRaw, ok1 := c.Get("userID")
+	roleRaw, ok2 := c.Get("role")
+	if !ok1 || !ok2 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	userID := userIDRaw.(int64)
+	role := roleRaw.(string)
+
+	order, err := h.service.GetOrderByID(c.Request.Context(), id, userID, role)
 	switch {
 	case errors.Is(err, pkgerrors.ErrNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
@@ -112,8 +121,8 @@ func (h *Handler) GetByID(c *gin.Context) {
 	}
 }
 
-// @Summary Get all user orders
-// @Description Возвращает список заказов текущего пользователя
+// @Summary Get all user orders (user/admin)
+// @Description Возвращает список заказов
 // @Tags orders
 // @Security BearerAuth
 // @Success 200 {array} order.Order
@@ -219,7 +228,7 @@ func (h *Handler) Delete(c *gin.Context) {
 	}
 }
 
-// @Summary Cancel order
+// @Summary Cancel order (user/admin)
 // @Description Отмена заказа пользователем
 // @Tags orders
 // @Security BearerAuth

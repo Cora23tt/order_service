@@ -77,6 +77,10 @@ func (h *Handler) SignIn(c *gin.Context) {
 
 	token, err := h.service.GenerateJWT(c.Request.Context(), creds.PhoneNumber, creds.Password)
 	if err != nil {
+		if errors.Is(err, pkgerrors.ErrNotFound) || errors.Is(err, pkgerrors.ErrInvalidCredentials) {
+			http.Error(c.Writer, "Invalid phone number or password", http.StatusUnauthorized)
+			return
+		}
 		http.Error(c.Writer, "Error initialising session token", http.StatusInternalServerError)
 		return
 	}

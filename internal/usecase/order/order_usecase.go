@@ -30,7 +30,7 @@ type CreateOrderInput struct {
 }
 
 type OrderItemInput struct {
-	ProductID int64 `json:"product_id" binding:"required"`
+	ProductID int64 `json:"product_id" binding:"required" example:"4"`
 	Quantity  int64 `json:"quantity" binding:"required" example:"4"`
 	Price     int64 `json:"price" binding:"required" example:"12000"`
 }
@@ -102,7 +102,7 @@ func (s *Service) CreateOrder(ctx context.Context, input CreateOrderInput) (int6
 	return orderID, nil
 }
 
-func (s *Service) GetOrderByID(ctx context.Context, orderID int64) (*repo.Order, error) {
+func (s *Service) GetOrderByID(ctx context.Context, orderID, userID int64, role string) (*repo.Order, error) {
 	order, err := s.repo.GetByID(ctx, orderID)
 	if err != nil {
 		s.log.Errorw("get order by id failed", "order_id", orderID, "error", err)
@@ -113,6 +113,12 @@ func (s *Service) GetOrderByID(ctx context.Context, orderID int64) (*repo.Order,
 			return nil, errors.ErrInternal
 		}
 	}
+
+	if role != "admin" && order.UserID != userID {
+		s.log.Warnw("unauthorized access to order", "order_id", orderID, "requester_id", userID)
+		return nil, errors.ErrNotFound
+	}
+
 	return order, nil
 }
 

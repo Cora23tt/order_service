@@ -29,7 +29,7 @@ type Product struct {
 	Quantity    int64  `json:"quantity" binding:"required,gte=0"`
 }
 
-// @Summary Get all products
+// @Summary Get all products (admin/user)
 // @Description Возвращает список всех доступных продуктов
 // @Tags products
 // @Success 200 {object} map[string]interface{} "products: []Product"
@@ -46,7 +46,7 @@ func (h *Handler) GetProducts(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"products": products})
 }
 
-// @Summary Get product by ID
+// @Summary Get product by ID 
 // @Description Возвращает продукт по его ID
 // @Tags products
 // @Param id path int true "Product ID"

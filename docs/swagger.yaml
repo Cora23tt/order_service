@@ -46,14 +46,12 @@ definitions:
     type: object
   order.CreateOrderRequest:
     properties:
-      delivery_date:
-        type: string
       items:
         items:
           $ref: '#/definitions/order.OrderItemInput'
         type: array
       pickup_point:
-        example: Mirzo Ulug'bek. Buyuk Ipak Yoli st. 109/45
+        example: Mirzo Ulug'bek. Buyuk Ipak Yoli st. 109. 45
         type: string
     required:
     - items
@@ -103,6 +101,7 @@ definitions:
         example: 12000
         type: integer
       product_id:
+        example: 4
         type: integer
       quantity:
         example: 4
@@ -176,9 +175,9 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: Получение списка всех пользователей
+      summary: Получение списка всех пользователей (admin)
       tags:
-      - Admin - Users
+      - User
   /api/v1/auth/signin:
     post:
       consumes:
@@ -327,7 +326,7 @@ paths:
       - User
   /api/v1/orders:
     get:
-      description: Возвращает список заказов текущего пользователя
+      description: Возвращает список заказов
       responses:
         "200":
           description: OK
@@ -349,14 +348,14 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: Get all user orders
+      summary: Get all user orders (user/admin)
       tags:
       - orders
   /api/v1/orders/:
     post:
       consumes:
       - application/json
-      description: Create a new order for authenticated user
+      description: Create a new order (user/admin)
       parameters:
       - description: Order info
         in: body
@@ -401,7 +400,7 @@ paths:
       - BearerAuth: []
       summary: Create order
       tags:
-      - Orders
+      - orders
   /api/v1/orders/{id}:
     delete:
       description: Удаляет заказ по ID
@@ -438,7 +437,7 @@ paths:
       tags:
       - orders
     get:
-      description: Возвращает заказ по ID (user/admin)
+      description: Возвращает заказ по ID
       parameters:
       - description: Order ID
         in: path
@@ -470,7 +469,7 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: Get order by ID
+      summary: Get order by ID (user/admin)
       tags:
       - orders
     put:
@@ -559,7 +558,7 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: Cancel order
+      summary: Cancel order (user/admin)
       tags:
       - orders
   /api/v1/orders/export:
@@ -713,7 +712,7 @@ paths:
             additionalProperties:
               type: string
             type: object
-      summary: Get all products
+      summary: Get all products (admin/user)
       tags:
       - products
     post:
@@ -902,4 +901,9 @@ paths:
       summary: Получение аватара пользователя
       tags:
       - User
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

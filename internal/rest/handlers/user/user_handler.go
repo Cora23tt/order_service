@@ -130,9 +130,9 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 }
 
 // ListUsers godoc
-// @Summary Получение списка всех пользователей
+// @Summary Получение списка всех пользователей (admin)
 // @Description Админский доступ. Возвращает список всех зарегистрированных пользователей
-// @Tags Admin - Users
+// @Tags User
 // @Security BearerAuth
 // @Produce json
 // @Success 200 {array} user.Profile
