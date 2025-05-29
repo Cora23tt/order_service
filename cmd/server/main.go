@@ -35,6 +35,17 @@ import (
 	"github.com/Cora23tt/order_service/pkg/logger"
 )
 
+// @title           Order Service API
+// @version         1.0
+// @description     REST API для управления заказами, продуктами и пользователями.
+// @termsOfService  http://example.com/terms/
+
+// @contact.name   API Support
+// @contact.email  support@example.com
+
+// @license.name  MIT
+// @host      localhost:8080
+// @BasePath  /
 func main() {
 	err := godotenv.Load()
 	if err != nil {

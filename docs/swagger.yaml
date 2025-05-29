@@ -1,0 +1,14 @@
+basePath: /
+host: localhost:8080
+info:
+  contact:
+    email: support@example.com
+    name: API Support
+  description: REST API для управления заказами, продуктами и пользователями.
+  license:
+    name: MIT
+  termsOfService: http://example.com/terms/
+  title: Order Service API
+  version: "1.0"
+paths: {}
+swagger: "2.0"

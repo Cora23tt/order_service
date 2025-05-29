@@ -6,7 +6,10 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
+	_ "github.com/Cora23tt/order_service/docs"
 	"github.com/Cora23tt/order_service/internal/rest/handlers/auth"
 	"github.com/Cora23tt/order_service/internal/rest/handlers/order"
 	"github.com/Cora23tt/order_service/internal/rest/handlers/product"
@@ -55,6 +58,7 @@ func (s *Server) SetupRoutes() {
 	s.mux.Use(s.middleware.ZapLogger())
 
 	s.mux.GET("/profile/:id/photo", s.user.GetProfilePhoto)
+	s.mux.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	authGroup := s.mux.Group(baseUrl + "/auth")
 	{
